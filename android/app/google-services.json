@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "770999682073",
+    "project_id": "third-b73d6",
+    "storage_bucket": "third-b73d6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:770999682073:android:e6b9f7b5ef8a67cd2c9688",
+        "android_client_info": {
+          "package_name": "com.example.third"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB4mp5HxUbOJtuRp5jjuNDz4hhSsrO0QXA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
