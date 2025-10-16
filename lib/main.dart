@@ -52,10 +52,11 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   static final _pages = [
-     const Page_home(),
-     const Page_search(),
-     const Page_message(),
-     Page_profile(),
+     const Page_search(), // 0:探す
+     Container(color: Colors.white, child: const Center(child: Text('承認ページ', style: TextStyle(fontSize: 32.0)))), // 1: 承認 (仮ページ)
+     Container(color: Colors.white, child: const Center(child: Text('予定ページ', style: TextStyle(fontSize: 32.0)))), // 2: 予定 (仮ページ)
+     const Page_message(), //3:トーク
+     Page_profile(), //4:アカウント
   ];
 
   int _selectedIndex = 0;
@@ -73,13 +74,17 @@ class _MyHomePageState extends State<MyHomePage> {
       bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
+          // 2, 5つのアイテムに変更
           items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(icon: Icon(Icons.home),label:'home'),
-            BottomNavigationBarItem(icon: Icon(Icons.search),label: 'search'),
-            BottomNavigationBarItem(icon: Icon(Icons.message),label: 'message'),
-            BottomNavigationBarItem(icon: Icon(Icons.person),label: 'profile'),
+            BottomNavigationBarItem(icon: Icon(Icons.search),label: '探す'),
+            BottomNavigationBarItem(icon: Icon(Icons.check_circle_outline),label: '承認'),
+            BottomNavigationBarItem(icon: Icon(Icons.calendar_today),label: '予定'),
+            BottomNavigationBarItem(icon: Icon(Icons.message),label: 'トーク'),
+            BottomNavigationBarItem(icon: Icon(Icons.person),label: 'アカウント'),
             ],
-        type: BottomNavigationBarType.fixed,
+        type: BottomNavigationBarType.fixed, // 5つのアイテムを均等に配置するために必要
+        selectedItemColor: Colors.blue, // 選択中のアイテムの色
+        unselectedItemColor: Colors.grey, // 選択されていないアイテムの色
       ),
     );
   }
