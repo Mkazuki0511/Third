@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:third/start/pages/lobby.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:third/pages/page_home.dart';
 import 'package:third/pages/page_search.dart';
 import 'package:third/pages/page_message.dart';
 import 'package:third/pages/page_profile.dart';
+import 'package:third/pages/page_approval.dart';
+import 'package:third/pages/page_schedule.dart';
 import 'firebase_options.dart';
 import 'package:third/sub/pages/page_profile.edit.dart';
 import 'package:provider/provider.dart';
 import '../providers/profile_provider.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,7 +39,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.white),
         useMaterial3: true,
       ),
-      home: const LobbyPage(), //最初の画面
+       home: const LobbyPage(), //最初の画面
     );
   }
 }
@@ -53,8 +55,8 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   static final _pages = [
      const Page_search(), // 0:探す
-     Container(color: Colors.white, child: const Center(child: Text('承認ページ', style: TextStyle(fontSize: 32.0)))), // 1: 承認 (仮ページ)
-     Container(color: Colors.white, child: const Center(child: Text('予定ページ', style: TextStyle(fontSize: 32.0)))), // 2: 予定 (仮ページ)
+     const Page_approval(), // 1: 承認
+     const Page_schedule(), // 2: 予定
      const Page_message(), //3:トーク
      Page_profile(), //4:アカウント
   ];
@@ -77,9 +79,9 @@ class _MyHomePageState extends State<MyHomePage> {
           // 2, 5つのアイテムに変更
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(icon: Icon(Icons.search),label: '探す'),
-            BottomNavigationBarItem(icon: Icon(Icons.check_circle_outline),label: '承認'),
+            BottomNavigationBarItem(icon: Icon(Icons.thumb_up),label: 'いいね'),
             BottomNavigationBarItem(icon: Icon(Icons.calendar_today),label: '予定'),
-            BottomNavigationBarItem(icon: Icon(Icons.message),label: 'トーク'),
+            BottomNavigationBarItem(icon: Icon(Icons.forum_outlined),label: 'トーク'),
             BottomNavigationBarItem(icon: Icon(Icons.person),label: 'アカウント'),
             ],
         type: BottomNavigationBarType.fixed, // 5つのアイテムを均等に配置するために必要
