@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:third/pages/page_user_profile.dart';
 import 'package:third/start/pages/lobby.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:third/pages/page_search.dart';
@@ -54,7 +55,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   static final _pages = [
-     const Page_search(), // 0:探す
+     const Page_user_profile(), // 0:探す //テスト用に変更中...
      const Page_approval(), // 1: 承認
      const Page_schedule(), // 2: 予定
      const Page_message(), //3:トーク
