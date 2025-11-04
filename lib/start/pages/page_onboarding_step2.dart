@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-// import 'page_onboarding_step3.dart'; // ← 次のステップで作成するメイン写真ページ
+import 'page_onboarding_step3.dart'; // メイン写真ページ
 
 class Page_onboarding_step2 extends StatefulWidget {
   // Step1から渡されたデータを保持するための変数
@@ -41,9 +41,9 @@ class _Page_onboarding_step2State extends State<Page_onboarding_step2> {
       // Firebase Auth に「ユーザー登録」のロジックを（将来）呼び出します。
 
       // そして、次の「メイン写真」ページに遷移します
-      // Navigator.push(context, MaterialPageRoute(
-      //   builder: (context) => Page_onboarding_step3(),
-      // ));
+      Navigator.push(context, MaterialPageRoute(
+        builder: (context) => Page_onboarding_step3(),
+      ));
       print("次のステップ（メイン写真）へ");
       print("Email: ${widget.email}"); // Step1から渡されたEmail
       print("Nickname: ${widget.nickname}"); // Step1から渡されたNickname
