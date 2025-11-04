@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-// import 'page_onboarding_step2.dart'; // ← 次のステップで作成するパスワード入力ページ
+import 'page_onboarding_step2.dart'; // パスワード入力ページ
 
 class Page_onboarding_step1 extends StatefulWidget {
   const Page_onboarding_step1({super.key});
@@ -31,13 +31,15 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
     // ここで、入力された情報（_nicknameController.text など）を
     // 次の「パスワード入力ページ」に渡して遷移します
 
-    // Navigator.push(context, MaterialPageRoute(
-    //   builder: (context) => Page_onboarding_step2(
-    //     nickname: _nicknameController.text,
-    //     email: _emailController.text,
-    //     // ... 他のデータも渡す
-    //   ),
-    // ));
+    Navigator.push(context, MaterialPageRoute(
+      builder: (context) => Page_onboarding_step2(
+        nickname: _nicknameController.text,
+        email: _emailController.text,
+        // TODO: gender: _selectedGender,
+        // TODO: birthday: _selectedBirthday,
+        // TODO: location: _selectedLocation,
+       ),
+     ));
     print("次のステップ（パスワード入力）へ");
   }
 
