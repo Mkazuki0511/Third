@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 // import 'package:image_picker/image_picker.dart'; // ← ロジック実装（フェーズ5）で使います
-// import 'page_onboarding_step4.dart'; // ← 次のステップで作成する詳細プロフページ
+import 'page_onboarding_step4.dart'; // 詳細プロフページ
 
 class Page_onboarding_step3 extends StatefulWidget {
   const Page_onboarding_step3({super.key});
@@ -15,7 +15,7 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
 
   // 「メイン写真を登録する」ボタンが押されたときの処理
   void _showImagePickerModal(BuildContext context) {
-    // `with-..-42.webp` のデザインで、下からモーダルを表示
+    // 下からモーダルを表示
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -38,7 +38,12 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
                     // 【フェーズ5】
                     // ここに image_picker でライブラリを起動するロジックを書く
                     print("ライブラリから選択");
+
                     Navigator.of(modalContext).pop();
+                    // 次の「詳細プロフィール」ページに遷移
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => const Page_onboarding_step4(),
+                    ));
                   },
                 ),
                 ListTile(

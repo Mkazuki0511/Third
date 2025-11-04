@@ -165,7 +165,7 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
               ),
               onPressed: isButtonEnabled ? _goToNextStep : null,
               child: const Text(
-                'SKILL LINK をはじめる',
+                '同意して次へ',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),

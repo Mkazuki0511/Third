@@ -55,7 +55,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   static final _pages = [
-     const Page_user_profile(), // 0:探す //テスト用に変更中...
+     const Page_search(), // 0:探す
      const Page_approval(), // 1: 承認
      const Page_schedule(), // 2: 予定
      const Page_message(), //3:トーク
