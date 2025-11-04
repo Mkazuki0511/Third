@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:third/start/pages/login.dart';
-// import 'package:third/start/pages/page_onboarding_step1.dart'; // ← 次のステップでこれを作成します
+import 'package:third/start/pages/page_onboarding_step1.dart';
 
 class LobbyPage extends StatelessWidget {
   const LobbyPage({super.key});
@@ -41,11 +41,10 @@ class LobbyPage extends StatelessWidget {
                   ),
                 ),
                 onPressed: () {
-                  // 【次のステップ】
-                  // ステップ4.2で作成する page_onboarding_step1.dart に遷移
-                  // Navigator.push(context, MaterialPageRoute(
-                  //   builder: (context) => const Page_onboarding_step1(),
-                  // ));
+                  // page_onboarding_step1.dart に遷移
+                  Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => const Page_onboarding_step1(),
+                  ));
                   print("新規登録ボタンが押されました (遷移先は次のステップで作成)");
                 },
                 child: const Text('新規登録の方はこちら', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
