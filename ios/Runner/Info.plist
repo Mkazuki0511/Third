@@ -45,5 +45,12 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<key>NS_PHOTO_LIBRARY_USAGE_DESCRIPTION</key>
+    <string>プロフィール写真を選択するためにライブラリにアクセスします</string>
+    <key>NS_CAMERA_USAGE_DESCRIPTION</key>
+    <string>プロフィール写真を撮影するためにカメラにアクセスします</string>
+    <key>NS_MICROPHONE_USAGE_DESCRIPTION</key>
+    <string>（カメラでビデオを撮る場合に必要ですが、念のため）</string>
 </dict>
 </plist>
