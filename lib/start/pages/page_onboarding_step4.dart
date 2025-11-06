@@ -23,10 +23,16 @@ class _Page_onboarding_step4State extends State<Page_onboarding_step4> {
   final TextEditingController _teachSkillController = TextEditingController();
   final TextEditingController _selfIntroController = TextEditingController();
 
-  // TODO: 各項目の選択値を保持する変数を（将来的に）追加する
-  // String? _location;
-  // String? _teachSkillLevel;
-  // ...
+  // 各 SelectorRow の選択値を保持する変数
+  String? _learnSkillLevel;
+  String? _teachSkillLevel;
+  String? _exchangeMethod;
+  String? _availableTime;
+
+  // 各選択肢のリスト
+  final List<String> _skillLevels = ['初心者', '中級者', '上級者', 'プロレベル'];
+  final List<String> _exchangeMethods = ['対面のみ', 'オンラインのみ', 'どちらも可'];
+  final List<String> _availableTimes = ['平日 昼', '平日 夜', '土日 祝日', 'いつでも可'];
 
   @override
   void dispose() {
@@ -60,10 +66,11 @@ class _Page_onboarding_step4State extends State<Page_onboarding_step4> {
         'teachSkill': _teachSkillController.text.trim(),
         'selfIntroduction': _selfIntroController.text.trim(),
 
-        // TODO: 将来的に、選択された他の項目もここに追加
-        // 'location': _location,
-        // 'exchangeMethod': _exchangeMethod,
-        // ...
+        // 新しく選択されたロジックのデータを保存
+        'learnSkillLevel': _learnSkillLevel,
+        'teachSkillLevel': _teachSkillLevel,
+        'exchangeMethod': _exchangeMethod,
+        'availableTime': _availableTime,
       };
 
       // 3. Firestoreのユーザー情報を更新 (update)
@@ -97,6 +104,46 @@ class _Page_onboarding_step4State extends State<Page_onboarding_step4> {
     }
   }
 
+  /// --- 選択肢を表示する汎用ダイアログ ---
+  Future<void> _showOptionDialog({
+    required String title,
+    required List<String> options,
+    required ValueChanged<String> onSelected, // 選択された値を親に返すコールバック
+  }) async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 300, // 高さを固定
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: options.length,
+              itemBuilder: (BuildContext context, int index) {
+                final option = options[index];
+                return ListTile(
+                  title: Text(option),
+                  onTap: () {
+                    onSelected(option); // 選択された値をコールバックで返す
+                    Navigator.of(dialogContext).pop(); // ダイアログを閉じる
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -122,23 +169,62 @@ class _Page_onboarding_step4State extends State<Page_onboarding_step4> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // --- フォーム本体 (差し替え) ---
-              _buildSelectorRow(label: '学びたいスキルのレベル', value: '未設定'),
-              _buildSelectorRow(label: '教えるスキルのレベル', value: '未設定'),
-              _buildSelectorRow(label: 'スキルの交換方法', value: '未設定'),
-              _buildSelectorRow(label: '対応可能時間', value: '未設定'),
-
-              // ↓↓↓↓ 【コントローラーを接続】 ↓↓↓↓
+              // --- フォーム本体 ---
+              //１．学びたいスキル
               _buildTextInputField(
                 controller: _learnSkillController, // ← 接続
                 label: '学びたいスキル',
                 hint: '例：デザイン、英語',
               ),
+              _buildSelectorRow(
+                label: '学びたいスキルのレベル',
+                value: _learnSkillLevel ?? '未設定',
+                onTap: () => _showOptionDialog(
+                  title: '学びたいレベルを選択',
+                  options: _skillLevels,
+                  onSelected: (value) => setState(() => _learnSkillLevel = value),
+                  ),
+              ),
+
+              // 2. 教えるスキル
               _buildTextInputField(
                 controller: _teachSkillController, // ← 接続
                 label: '教えることができるスキル',
-                hint: '例：化学、プログラミング',
+                hint: '例：動画編集、プログラミング',
               ),
+              _buildSelectorRow(
+                label: '教えるスキルのレベル',
+                value: _teachSkillLevel ?? '未設定',
+                onTap: () => _showOptionDialog(
+                  title: '教えるレベルを選択',
+                  options: _skillLevels,
+                  onSelected: (value) => setState(() => _teachSkillLevel = value),
+                ),
+              ),
+
+              // 3. スキル交換の方法
+              _buildSelectorRow(
+                label: 'スキルの交換方法',
+                value: _exchangeMethod ?? '未設定',
+                onTap: () => _showOptionDialog(
+                  title: '交換方法を選択',
+                  options: _exchangeMethods,
+                  onSelected: (value) => setState(() => _exchangeMethod = value),
+                ),
+              ),
+
+              // 4. 対応可能時間
+              _buildSelectorRow(
+                label: '対応可能時間',
+                value: _availableTime ?? '未設定',
+                onTap: () => _showOptionDialog(
+                  title: '対応時間を選択',
+                  options: _availableTimes,
+                  onSelected: (value) => setState(() => _availableTime = value),
+                ),
+              ),
+
+              // 5. 自己紹介
               _buildTextInputField(
                 controller: _selfIntroController, // ← 接続
                 label: '自己紹介',
@@ -153,12 +239,13 @@ class _Page_onboarding_step4State extends State<Page_onboarding_step4> {
   }
 
   /// 項目（ラベルと値）の共通ウィジェット (選択式)
-  Widget _buildSelectorRow({required String label, required String value}) {
+  Widget _buildSelectorRow({
+    required String label,
+    required String value,
+    required VoidCallback onTap, // ← 追加
+  }) {
     return GestureDetector(
-      onTap: () {
-        // TODO: 各項目（出身地など）の選択ロジックを実装
-        print("$label がタップされました");
-      },
+      onTap: onTap, // ← 接続
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20.0),
         decoration: const BoxDecoration(
