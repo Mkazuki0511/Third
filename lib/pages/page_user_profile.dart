@@ -1,13 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ← Auth をインポート
+import 'package:cloud_firestore/cloud_firestore.dart'; // ← Firestore をインポート
 
 // これは「他人の」プロフィール詳細を表示するページです
 class Page_user_profile extends StatelessWidget {
-  const Page_user_profile({super.key});
+
+  // ↓↓↓↓ 【ここから修正】 ↓↓↓↓
+  // どのユーザーのプロフィールを表示するか、IDを受け取る
+  final String userId;
+
+  const Page_user_profile({
+    super.key,
+    required this.userId, // ← 必須の引数として追加
+  });
+  // ↑↑↑↑ 【ここまで修正】 ↑↑↑↑
+
+
+  /// --- birthday(Timestamp) から年齢を計算するロジック ---
+  /// (page_profile_edit からコピー)
+  String _calculateAge(Timestamp? birthdayTimestamp) {
+    if (birthdayTimestamp == null) return '?';
+    final DateTime birthday = birthdayTimestamp.toDate();
+    final DateTime today = DateTime.now();
+    int age = today.year - birthday.year;
+    if (today.month < birthday.month || (today.month == birthday.month && today.day < birthday.day)) {
+      age--;
+    }
+    return age.toString();
+  }
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100], // 全体の背景色
+      backgroundColor: Colors.grey[100],
 
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -15,72 +41,96 @@ class Page_user_profile extends StatelessWidget {
         elevation: 0,
       ),
 
-      // ↓↓↓↓ 【修正①】bottomNavigationBar を削除 ↓↓↓↓
-      // bottomNavigationBar: _buildFixedLikeButton(),
+      // 「いいね！」ボタンを画面下部に固定
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: _buildFloatingLikeButton(context, userId), // ← userId を渡す
 
-      // ↓↓↓↓ 【修正②】body を Stack に変更 ↓↓↓↓
-      body: Stack(
-        children: [
-          // 【1層目】スクロールするコンテンツ
-          _buildScrollingContent(),
+      // ↓↓↓↓ 【ここから StreamBuilder に変更】 ↓↓↓↓
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        // --- 1. Stream（データの流れ）を定義 ---
+        // ログイン中のユーザーではなく、
+        // 渡された 'widget.userId' のユーザー情報を監視する
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId) // ← ここが最重要！
+            .snapshots(),
 
-          // 【2層目】手前に浮き上がる「いいね！」ボタン
-          _buildFloatingLikeButton(),
-        ],
-      ),
-    );
-  }
+        builder: (context, snapshot) {
 
-  /// 1層目：スクロールするコンテンツ
-  Widget _buildScrollingContent() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildMainPhotoCard(), // メイン写真 (AppBarの裏から表示)
+          // --- 2. 読み込み中/エラーのUI ---
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || !snapshot.data!.exists) {
+            return const Center(child: Text('ユーザーデータが見つかりません'));
+          }
 
-          // 写真以外のコンテンツ
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          // --- 3. 成功！データを取得 ---
+          final userData = snapshot.data!.data()!;
+          final String nickname = userData['nickname'] ?? '名前なし';
+          final String? profileImageUrl = userData['profileImageUrl'];
+          final String location = userData['location'] ?? '未設定';
+          final Timestamp? birthdayTimestamp = userData['birthday'];
+          final String age = _calculateAge(birthdayTimestamp);
+          final String selfIntroduction = userData['selfIntroduction'] ?? '自己紹介がありません';
+          final String teachSkill = userData['teachSkill'] ?? '未設定';
+          final String learnSkill = userData['learnSkill'] ?? '未設定';
+
+          // TODO: 他のデータもすべて取得...
+
+          // --- 4. データを使ってUIを構築 ---
+          return SingleChildScrollView(
+            padding: EdgeInsets.zero,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 16),
-                _buildNameAndLocation(), // 名前と基本情報
-                const SizedBox(height: 16),
-                _buildSelfIntroductionCard(), // 自己紹介
-                const SizedBox(height: 16),
-                _buildBasicInfoCard(), // 基本情報（詳細）
-                const SizedBox(height: 16),
-                _buildInterestsCard(), // 興味・関心タグ
+                _buildMainPhotoCard(profileImageUrl),
 
-                // ↓↓↓↓ 【修正③】超重要！ボタンが重なる分の「透明な余白」を一番下に追加 ↓↓↓↓
-                const SizedBox(height: 120),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 16),
+                      // ↓↓↓↓ 【本物のデータに差し替え】 ↓↓↓↓
+                      _buildNameAndLocation(nickname, age, location, teachSkill, learnSkill),
+                      const SizedBox(height: 16),
+                      _buildSelfIntroductionCard(selfIntroduction),
+                      const SizedBox(height: 16),
+                      _buildBasicInfoCard(), // (まだダミー)
+                      const SizedBox(height: 16),
+                      _buildInterestsCard(), // (まだダミー)
+                      const SizedBox(height: 120), // ボタンの余白
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
+          );
+        },
       ),
+      // ↑↑↑↑ 【StreamBuilder ここまで】 ↑↑↑↑
     );
   }
 
   /// 2層目：画面下部に固定される「いいね！」ボタン
-  Widget _buildFloatingLikeButton() {
-    // Stackの中で Align を使うことで、特定の位置に固定できます
+  Widget _buildFloatingLikeButton(BuildContext context, String targetUserId) {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
-        // ↓↓↓↓ 【修正④】背景を透明に ↓↓↓↓
         color: Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        // SafeAreaで、OSのナビゲーションバー（iPhoneのホームバーなど）を避ける
         child: SafeArea(
           child: SizedBox(
-            width: double.infinity, // 横幅いっぱいに広げる
+            width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
-                // 【フェーズ4】ここに「いいね！」ロジックを実装
+                // 【フェーズ5.3】
+                // ここに「いいね！」（リクエスト）のロジックを実装
+                // 1. 自分のID (currentUser.uid) を取得
+                // 2. 相手のID (targetUserId) を取得
+                // 3. Firestore に「リクエスト」を送信する
+                print("「いいね！」しました -> $targetUserId");
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.cyan,
@@ -102,57 +152,44 @@ class Page_user_profile extends StatelessWidget {
     );
   }
 
-  // --- ここから下は、コンテンツの中身 (変更なし) ---
+
+  // --- (ここから下は、UI表示用のメソッド) ---
 
   /// メインの写真カード
-  Widget _buildMainPhotoCard() {
-    // (変更なし)
+  Widget _buildMainPhotoCard(String? profileImageUrl) {
     return AspectRatio(
       aspectRatio: 3 / 4,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.grey[300],
-          image: const DecorationImage(
-            image: NetworkImage('https://via.placeholder.com/400x600/CCCCCC/FFFFFF?text=PROFILE_IMAGE'),
+          image: profileImageUrl != null
+              ? DecorationImage(
+            image: NetworkImage(profileImageUrl),
             fit: BoxFit.cover,
-          ),
+          )
+              : null,
         ),
-        child: Align(
-          alignment: Alignment.bottomLeft,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.green[400],
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: const Text(
-                'オンライン',
-                style: TextStyle(color: Colors.white, fontSize: 12),
-              ),
-            ),
-          ),
-        ),
+        child: profileImageUrl == null
+            ? const Center(child: Icon(Icons.person, size: 100, color: Colors.white))
+            : Align( /* ... (オンライン表示) ... */ ),
       ),
     );
   }
 
   /// 名前のエリア
-  Widget _buildNameAndLocation() {
-    // (変更なし)
+  Widget _buildNameAndLocation(String nickname, String age, String location, String teachSkill, String learnSkill) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'りょう 23歳 愛知',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              '$nickname $age歳 $location',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            Chip(
-              label: Text('Partner'),
+            const Chip(
+              label: Text('Partner'), // (ダミー)
               backgroundColor: Colors.blueAccent,
               labelStyle: TextStyle(color: Colors.white, fontSize: 12),
               visualDensity: VisualDensity.compact,
@@ -163,14 +200,14 @@ class Page_user_profile extends StatelessWidget {
         Row(
           children: [
             Chip(
-              label: const Text('教えるよ: 化学'),
+              label: Text('教えるよ: $teachSkill'),
               backgroundColor: Colors.cyan[100],
               labelStyle: const TextStyle(color: Colors.cyan, fontSize: 12),
               visualDensity: VisualDensity.compact,
             ),
             const SizedBox(width: 8),
             Chip(
-              label: const Text('学びたい: デザイン'),
+              label: Text('学びたい: $learnSkill'),
               backgroundColor: Colors.cyan[100],
               labelStyle: const TextStyle(color: Colors.cyan, fontSize: 12),
               visualDensity: VisualDensity.compact,
@@ -182,31 +219,23 @@ class Page_user_profile extends StatelessWidget {
   }
 
   /// 自己紹介カード
-  Widget _buildSelfIntroductionCard() {
-    // (変更なし)
+  Widget _buildSelfIntroductionCard(String selfIntroduction) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: const Padding(
-        padding: EdgeInsets.all(16.0),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               '自己紹介文',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
-              'はじめまして！ りょうです。\n\n'
-                  '大学院で理学研究を専攻しており、\n'
-                  '日々研究や研究発表に追われています。\n'
-                  '化学の知識や実験データのまとめ方については\n'
-                  '詳しく、人に教えることも多いです。\n\n'
-                  'ただ、私には大きな悩みがあります。\n'
-                  'どうしても見栄えが悪く、\n'
-                  '伝えたいことが十分に伝わらないと感じています。',
-              style: TextStyle(fontSize: 16, height: 1.5),
+              selfIntroduction,
+              style: const TextStyle(fontSize: 16, height: 1.5),
             ),
           ],
         ),
@@ -214,81 +243,16 @@ class Page_user_profile extends StatelessWidget {
     );
   }
 
-  /// 基本情報カード
+  /// 基本情報カード (まだダミー)
   Widget _buildBasicInfoCard() {
-    // (変更なし)
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '基本情報',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 12),
-            _buildInfoRow(icon: Icons.work_outline, label: '職業', value: '大学院生'),
-            Divider(height: 20),
-            _buildInfoRow(icon: Icons.school_outlined, label: '学歴', value: '大学卒'),
-          ],
-        ),
-      ),
-    );
+    return Card(/* ... */);
   }
-
-  /// 興味・関心カード
+  /// 興味・関心カード (まだダミー)
   Widget _buildInterestsCard() {
-    // (変更なし)
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '興味・関心',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 12),
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 8.0,
-              children: [
-                Chip(
-                  label: Text('化学'),
-                  backgroundColor: Colors.blue.withOpacity(0.1),
-                  labelStyle: TextStyle(color: Colors.blue),
-                ),
-                Chip(
-                  label: Text('デザイン'),
-                  backgroundColor: Colors.blue.withOpacity(0.1),
-                  labelStyle: TextStyle(color: Colors.blue),
-                ),
-                // ...
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+    return Card(/* ... */);
   }
-
-  /// 基本情報カード内の一行
+  /// 基本情報カード内の一行 (まだダミー)
   Widget _buildInfoRow({required IconData icon, required String label, required String value}) {
-    // (変更なし)
-    return Row(
-      children: [
-        Icon(icon, color: Colors.grey[700], size: 20),
-        SizedBox(width: 12),
-        Text(label, style: const TextStyle(fontSize: 16)),
-        Spacer(),
-        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ],
-    );
+    return Row(/* ... */);
   }
 }
