@@ -7,15 +7,17 @@ class Page_onboarding_step2 extends StatefulWidget {
   // Step1から渡されたデータを保持するための変数
   final String nickname;
   final String email;
-  // TODO: final String gender;
-  // TODO: final DateTime birthday;
-  // TODO: final String location;
+  final String? gender;
+  final DateTime? birthday;
+  final String? location;
 
   const Page_onboarding_step2({
     super.key,
     required this.nickname,
     required this.email,
-    // TODO: 他のデータも受け取る
+    this.gender,
+    this.birthday,
+    this.location,
   });
 
   @override
@@ -68,17 +70,15 @@ class _Page_onboarding_step2State extends State<Page_onboarding_step2> {
           'email': widget.email,
           'nickname': widget.nickname,
           'createdAt': FieldValue.serverTimestamp(), // 作成日時
+          'gender': widget.gender,
+          'birthday': widget.birthday,
+          'location': widget.location,
 
-            // TODO: Step1から渡された他の情報もここに追加
-            // 'gender': widget.gender,
-            // 'birthday': widget.birthday,
-            // 'location': widget.location,
-
-            // Step3以降で追加される情報（今はまだ null）
-            'profileImageUrl': null,
-            'teachSkill': null,
-            'learnSkill': null,
-            'selfIntroduction': null,
+           // Step3以降で追加される情報（今はまだ null）
+          'profileImageUrl': null,
+          'teachSkill': null,
+          'learnSkill': null,
+          'selfIntroduction': null,
           });
 
           // --- 3. 成功したら次のStep3（メイン写真）へ ---

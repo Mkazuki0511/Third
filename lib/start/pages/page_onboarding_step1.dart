@@ -18,6 +18,17 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
   bool _is18OrOlder = false;
   bool _agreedToTerms = false;
 
+  // 47都道府県のリスト
+  final List<String> _prefectures = [
+    '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+    '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+    '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
+    '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
+    '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
+    '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
+    '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'
+  ];
+
   @override
   void dispose() {
     _nicknameController.dispose();
@@ -25,25 +36,20 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
     super.dispose();
   }
 
-  // 「withをはじめる」ボタンが押されたときの処理
   void _goToNextStep() {
-    // 【フェーズ4.3】
-    // ここで、入力された情報（_nicknameController.text など）を
-    // 次の「パスワード入力ページ」に渡して遷移します
-
     Navigator.push(context, MaterialPageRoute(
       builder: (context) => Page_onboarding_step2(
         nickname: _nicknameController.text,
         email: _emailController.text,
-        // TODO: gender: _selectedGender,
-        // TODO: birthday: _selectedBirthday,
-        // TODO: location: _selectedLocation,
+        gender: _selectedGender,
+        birthday: _selectedBirthday,
+        location: _selectedLocation,
        ),
      ));
     print("次のステップ（パスワード入力）へ");
   }
 
-  // 生年月日ピッカーを表示する
+  // 生年月日ピッカー
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -57,6 +63,84 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
       });
     }
   }
+
+  // 性別選択ダイアログ
+  Future<void> _showGenderDialog() async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('性別を選択'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min, // 高さを最小に
+            children: [
+              // 「男性」を選択するタイル
+              ListTile(
+                title: const Text('男性'),
+                onTap: () {
+                  setState(() {
+                    _selectedGender = '男性';
+                  });
+                  Navigator.of(dialogContext).pop(); // ダイアログを閉じる
+                },
+              ),
+              // 「女性」を選択するタイル
+              ListTile(
+                title: const Text('女性'),
+                onTap: () {
+                  setState(() {
+                    _selectedGender = '女性';
+                  });
+                  Navigator.of(dialogContext).pop(); // ダイアログを閉じる
+                },
+              ),
+              // TODO: 必要に応じて「その他」や「回答しない」も追加できます
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// --- 居住地選択ダイアログを表示するロジック ---
+  Future<void> _showLocationDialog() async {
+    await showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('居住地を選択'),
+          // content が長くなるので、SizedBox で高さを指定し、スクロール可能にする
+          content: SizedBox(
+            width: double.maxFinite, // 横幅を最大に
+            height: 300, // 高さを300に固定（お好みで調整）
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _prefectures.length, // 47都道府県のリスト
+              itemBuilder: (BuildContext context, int index) {
+                final prefecture = _prefectures[index];
+                return ListTile(
+                  title: Text(prefecture),
+                  onTap: () {
+                    setState(() {
+                      _selectedLocation = prefecture; // 選択した都道府県を保存
+                    });
+                    Navigator.of(dialogContext).pop(); // ダイアログを閉じる
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -100,14 +184,14 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
               label: 'ニックネーム',
               hint: 'ニックネームを入力', // ヒント
             ),
+
+            // 性別選択ができるように修正
             _buildSelectorField(
               label: '性別',
-              value: _selectedGender ?? '男性', // ダミー
-              onTap: () {
-                // TODO: 性別選択のDropdown
-                print("性別を選択");
-              },
+              value: _selectedGender ?? '選択してください', // ← 選択された値を表示
+              onTap: _showGenderDialog,
             ),
+
             _buildSelectorField(
               label: '生年月日',
               value: _selectedBirthday == null
@@ -115,14 +199,15 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
                   : '${_selectedBirthday!.year}年 ${_selectedBirthday!.month}月 ${_selectedBirthday!.day}日',
               onTap: () => _selectDate(context), // DatePickerを呼び出す
             ),
+
+            // 居住地が選択できるように修正
             _buildSelectorField(
               label: '居住地',
-              value: _selectedLocation ?? '東京', // ダミー
-              onTap: () {
-                // TODO: 居住地選択
-                print("居住地を選択");
-              },
+              value: _selectedLocation ?? '選択してください', // 選択された値を表示
+              onTap: _showLocationDialog,
             ),
+
+
             _buildTextField(
               controller: _emailController,
               label: 'メールアドレス',
