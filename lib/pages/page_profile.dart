@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // ← Auth をインポート
 import 'package:cloud_firestore/cloud_firestore.dart'; // ← Firestore をインポート
-// import 'package:third/sub/pages/page_profile.edit.dart'; // 将来「プロフィールを確認・編集」で使います
+import 'package:third/sub/pages/page_profile.edit.dart'; // 「プロフィールを確認・編集」
 
 class Page_profile extends StatelessWidget {
   const Page_profile({super.key});
@@ -54,7 +54,8 @@ class Page_profile extends StatelessWidget {
                 child: Column(
                   children: [
                     // ↓↓↓↓ 【ここがロジック】 データを渡す ↓↓↓↓
-                    _buildHeader(userData),
+                    // _buildHeader に (context, userData) を渡す
+                    _buildHeader(context, userData),
                     const SizedBox(height: 16),
 
                     // ↓↓↓↓ 【注意】以下の項目はまだダミーデータです ↓↓↓↓
@@ -75,7 +76,7 @@ class Page_profile extends StatelessWidget {
 
   /// ヘッダー（アイコン、統計、編集ボタン）
   // ↓↓↓↓ 【修正】userData を受け取るように変更 ↓↓↓↓
-  Widget _buildHeader(Map<String, dynamic> userData) {
+  Widget _buildHeader(BuildContext context, Map<String, dynamic> userData) {
     // Firestoreから nickname と profileImageUrl を取得
     final String nickname = userData['nickname'] ?? '名前なし';
     final String? profileImageUrl = userData['profileImageUrl']; // null の可能性がある
@@ -124,9 +125,14 @@ class Page_profile extends StatelessWidget {
           child: OutlinedButton.icon(
             icon: const Icon(Icons.edit, size: 18),
             label: const Text('プロフィールを確認・編集'),
+
             onPressed: () {
-              // TODO: プロフィール編集ページへの遷移
+              // 新しく作った「自分のプロフィール確認」ページへ遷移
+              Navigator.push(context, MaterialPageRoute(
+                builder: (context) => const Page_profile_edit(),
+              ));
             },
+
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.black,
               side: const BorderSide(color: Colors.grey),
