@@ -1,23 +1,33 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ← Auth をインポート
-import 'package:cloud_firestore/cloud_firestore.dart'; // ← Firestore をインポート
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-// これは「他人の」プロフィール詳細を表示するページです
-class Page_user_profile extends StatelessWidget {
+// ↓↓↓↓ 【修正①】StatelessWidget -> StatefulWidget に変更 ↓↓↓↓
+class Page_user_profile extends StatefulWidget {
 
-  // ↓↓↓↓ 【ここから修正】 ↓↓↓↓
   // どのユーザーのプロフィールを表示するか、IDを受け取る
   final String userId;
 
   const Page_user_profile({
     super.key,
-    required this.userId, // ← 必須の引数として追加
+    required this.userId,
   });
-  // ↑↑↑↑ 【ここまで修正】 ↑↑↑↑
 
+  @override
+  State<Page_user_profile> createState() => _Page_user_profileState();
+}
+
+// ↓↓↓↓ 【修正②】新しい _State クラスを作成 ↓↓↓↓
+class _Page_user_profileState extends State<Page_user_profile> {
+
+  // Firebaseのインスタンス
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // 「いいね！」ボタンのローディング状態
+  bool _isLoading = false;
 
   /// --- birthday(Timestamp) から年齢を計算するロジック ---
-  /// (page_profile_edit からコピー)
   String _calculateAge(Timestamp? birthdayTimestamp) {
     if (birthdayTimestamp == null) return '?';
     final DateTime birthday = birthdayTimestamp.toDate();
@@ -28,6 +38,62 @@ class Page_user_profile extends StatelessWidget {
     }
     return age.toString();
   }
+
+  // ↓↓↓↓ 【ここからが今回のロジック】 ↓↓↓↓
+  /// --- 「いいね！」(リクエスト) を送信するロジック ---
+  Future<void> _sendRequest() async {
+    // 1. 自分のID (currentUser) と 相手のID (targetUser) を取得
+    final String? myId = _auth.currentUser?.uid;
+    final String targetUserId = widget.userId; // ← StatefulWidgetなので 'widget.' が必要
+
+    if (myId == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('エラー: ログインしていません')),
+      );
+      return;
+    }
+
+    // 2. 既にリクエスト済みか、マッチ済みか、などを（将来的には）チェックする
+    // TODO: (今はシンプルに、押したらリクエストを送る)
+
+    setState(() {
+      _isLoading = true; // ローディング開始
+    });
+
+    try {
+      // 3. Firestore の 'requests' コレクションに新しいドキュメントを追加
+      await _firestore.collection('requests').add({
+        'fromId': myId,         // 送信者 (自分)
+        'toId': targetUserId, // 受信者 (相手)
+        'status': 'pending',  // 状態: '承認待ち'
+        'createdAt': FieldValue.serverTimestamp(), // 送信日時
+      });
+
+      // 4. 成功メッセージを表示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('「いいね！」を送信しました！')),
+        );
+        Navigator.of(context).pop(); // (例: 探す画面に戻る)
+      }
+
+    } catch (e) {
+      // エラー処理
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('リクエストの送信に失敗しました: $e')),
+        );
+      }
+    } finally {
+      // 処理が完了したらローディングを解除
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  // ↑↑↑↑ 【ロジックここまで】 ↑↑↑↑
 
 
   @override
@@ -43,21 +109,15 @@ class Page_user_profile extends StatelessWidget {
 
       // 「いいね！」ボタンを画面下部に固定
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _buildFloatingLikeButton(context, userId), // ← userId を渡す
+      // ↓↓↓↓ 【修正③】_isLoading を渡す ↓↓↓↓
+      floatingActionButton: _buildFloatingLikeButton(context, _isLoading),
 
-      // ↓↓↓↓ 【ここから StreamBuilder に変更】 ↓↓↓↓
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        // --- 1. Stream（データの流れ）を定義 ---
-        // ログイン中のユーザーではなく、
-        // 渡された 'widget.userId' のユーザー情報を監視する
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId) // ← ここが最重要！
-            .snapshots(),
+        // ↓↓↓↓ 【修正④】widget.userId を使う ↓↓↓↓
+        stream: _firestore.collection('users').doc(widget.userId).snapshots(),
 
         builder: (context, snapshot) {
 
-          // --- 2. 読み込み中/エラーのUI ---
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -65,7 +125,7 @@ class Page_user_profile extends StatelessWidget {
             return const Center(child: Text('ユーザーデータが見つかりません'));
           }
 
-          // --- 3. 成功！データを取得 ---
+          // データを取得
           final userData = snapshot.data!.data()!;
           final String nickname = userData['nickname'] ?? '名前なし';
           final String? profileImageUrl = userData['profileImageUrl'];
@@ -76,9 +136,7 @@ class Page_user_profile extends StatelessWidget {
           final String teachSkill = userData['teachSkill'] ?? '未設定';
           final String learnSkill = userData['learnSkill'] ?? '未設定';
 
-          // TODO: 他のデータもすべて取得...
-
-          // --- 4. データを使ってUIを構築 ---
+          // UIを構築 (変更なし)
           return SingleChildScrollView(
             padding: EdgeInsets.zero,
             child: Column(
@@ -92,7 +150,6 @@ class Page_user_profile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 16),
-                      // ↓↓↓↓ 【本物のデータに差し替え】 ↓↓↓↓
                       _buildNameAndLocation(nickname, age, location, teachSkill, learnSkill),
                       const SizedBox(height: 16),
                       _buildSelfIntroductionCard(selfIntroduction),
@@ -109,12 +166,12 @@ class Page_user_profile extends StatelessWidget {
           );
         },
       ),
-      // ↑↑↑↑ 【StreamBuilder ここまで】 ↑↑↑↑
     );
   }
 
   /// 2層目：画面下部に固定される「いいね！」ボタン
-  Widget _buildFloatingLikeButton(BuildContext context, String targetUserId) {
+  // ↓↓↓↓ 【修正⑤】isLoading を受け取る ↓↓↓↓
+  Widget _buildFloatingLikeButton(BuildContext context, bool isLoading) {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
@@ -124,14 +181,8 @@ class Page_user_profile extends StatelessWidget {
           child: SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                // 【フェーズ5.3】
-                // ここに「いいね！」（リクエスト）のロジックを実装
-                // 1. 自分のID (currentUser.uid) を取得
-                // 2. 相手のID (targetUserId) を取得
-                // 3. Firestore に「リクエスト」を送信する
-                print("「いいね！」しました -> $targetUserId");
-              },
+              // ↓↓↓↓ 【修正⑥】ローディング中は押せないように(null)する ↓↓↓↓
+              onPressed: isLoading ? null : _sendRequest,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.cyan,
                 foregroundColor: Colors.white,
@@ -139,11 +190,19 @@ class Page_user_profile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(30.0),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 16.0),
+                // ↓↓↓↓ 【修正⑦】ローディング中の見た目を設定 ↓↓↓↓
+                disabledBackgroundColor: Colors.grey[400],
               ),
-              icon: const Icon(Icons.thumb_up_alt_outlined),
-              label: const Text(
-                'いいね！',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              icon: isLoading
+                  ? Container( // ローディング中はインジケーターを表示
+                width: 24, height: 24,
+                padding: const EdgeInsets.all(2.0),
+                child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+              )
+                  : const Icon(Icons.thumb_up_alt_outlined), // 通常時はアイコン
+              label: Text(
+                isLoading ? '送信中...' : 'いいね！', // テキストも切り替える
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -151,7 +210,6 @@ class Page_user_profile extends StatelessWidget {
       ),
     );
   }
-
 
   // --- (ここから下は、UI表示用のメソッド) ---
 

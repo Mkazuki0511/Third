@@ -12,13 +12,11 @@ class Page_search extends StatefulWidget {
 }
 
 class _Page_searchState extends State<Page_search> {
-
   // ↓↓↓↓ 【ここからロジック】 ↓↓↓↓
-  // 現在ログインしているユーザーのID
-  final String? _currentUserUid = FirebaseAuth.instance.currentUser?.uid;
+  final String? _currentUserUid = FirebaseAuth.instance.currentUser?.uid; // 現在ログインしているユーザーのID
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // ← Firestore インスタンスを追加
 
   /// --- birthday(Timestamp) から年齢を計算するロジック ---
-  /// (page_profile_edit からコピー)
   String _calculateAge(Timestamp? birthdayTimestamp) {
     if (birthdayTimestamp == null) {
       return '?'; // データがなければ '?' を表示
@@ -31,6 +29,31 @@ class _Page_searchState extends State<Page_search> {
     }
     return age.toString();
   }
+
+  /// --- 自分が既にリクエストした（またはマッチした）相手のIDリストを取得する ---
+  Future<List<String>> _getInteractedUserIds() async {
+    if (_currentUserUid == null) {
+      return []; // ログインしてなければ空
+    }
+
+    // 1. 自分が「送信」したリクエスト（いいね！した相手）
+    final requestsSnapshot = await _firestore
+        .collection('requests')
+        .where('fromId', isEqualTo: _currentUserUid)
+        .get();
+
+    // 相手のID (toId) だけをリストに抽出
+    final List<String> requestedUserIds = requestsSnapshot.docs.map((doc) {
+      return doc.data()['toId'] as String;
+    }).toList();
+
+    // 2. （将来）マッチ済みの相手などもここに追加
+
+    // 3. 自分のIDもリストに追加（自分自身を「探す」に表示しないため）
+    requestedUserIds.add(_currentUserUid!);
+
+    return requestedUserIds;
+  }
   // ↑↑↑↑ 【ロジックここまで】 ↑↑↑↑
 
   @override
@@ -40,64 +63,77 @@ class _Page_searchState extends State<Page_search> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildSearchBar(), // 検索バーとフィルターボタン (変更なし)
+            _buildSearchBar(), // 検索バーとフィルターボタン
 
             // ユーザーカードのリスト（スクロール可能）
             Expanded(
               // ↓↓↓↓ 【ここから StreamBuilder に変更】 ↓↓↓↓
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                // --- 1. Stream（データの流れ）を定義 ---
-                // 'users' コレクションから
-                // 'uid' が 'currentUserUid' と「等しくない」もの（＝自分以外）を取得
-                stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .where('uid', isNotEqualTo: _currentUserUid)
-                    .snapshots(), // リアルタイムで監視
+              child: FutureBuilder<List<String>>(
+                  future: _getInteractedUserIds(), // ← 今作ったメソッドを呼ぶ
+                  builder: (context, interactionSnapshot) {
 
-                // --- 2. Stream の状態に応じてUIを構築 ---
-                builder: (context, snapshot) {
-                  // 読み込み中
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+                    // 1. IDリストの読み込み中
+                    if (interactionSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                  // エラー発生
-                  if (snapshot.hasError) {
-                    return Center(child: Text('エラー: ${snapshot.error}'));
-                  }
+                    // 2. IDリストの取得に失敗
+                    if (interactionSnapshot.hasError) {
+                      return Center(child: Text('エラー: ${interactionSnapshot.error}'));
+                    }
 
-                  // データが 0件 の場合
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(child: Text('表示できるユーザーがいません'));
-                  }
+                    // 3. IDリスト取得成功
+                    // (もしリストが空でも、自分のIDは含まれているので 'whereNotIn' はエラーにならない)
+                    final List<String> interactedUserIds = interactionSnapshot.data ?? [_currentUserUid!];
 
-                  // --- 3. 成功！データを取得 ---
-                  final usersDocs = snapshot.data!.docs;
+                    // 4. IDリストを使って、「ユーザー」のStreamBuilderを構築
+                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      // 'uid' が「操作済みIDリスト」に【含まれない】ユーザーだけを取得
+                      stream: _firestore
+                          .collection('users')
+                          .where('uid', whereNotIn: interactedUserIds.isEmpty ? ['dummyId'] : interactedUserIds) // 'whereNotIn' を使用
+                          .snapshots(),
 
-                  // --- 4. GridView.builder でデータを表示 ---
-                  return GridView.builder(
-                    padding: const EdgeInsets.all(16.0),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12.0,
-                      mainAxisSpacing: 12.0,
-                      childAspectRatio: 1.0, // 正方形
-                    ),
-                    itemCount: usersDocs.length, // Firestoreから取得した数
-                    itemBuilder: (context, index) {
-                      // 1人分のユーザーデータを取得
-                      final userData = usersDocs[index].data();
+                      builder: (context, userSnapshot) {
+                        // 読み込み中
+                        if (userSnapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
 
-                      // データをカードウィジェットに渡す
-                      return _buildUserGridCard(
-                        context: context, // ← 遷移用に context を渡す
-                        userData: userData, // ← 1人分のデータを渡す
-                      );
-                    },
-                  );
-                },
+                        // エラー発生
+                        if (userSnapshot.hasError) {
+                          return Center(child: Text('エラー: ${userSnapshot.error}'));
+                        }
+
+                        // データが 0件
+                        if (!userSnapshot.hasData || userSnapshot.data!.docs.isEmpty) {
+                          return const Center(child: Text('表示できるユーザーがいません'));
+                        }
+
+                        // 成功！
+                        final usersDocs = userSnapshot.data!.docs;
+
+                        return GridView.builder(
+                          padding: const EdgeInsets.all(16.0),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12.0,
+                            mainAxisSpacing: 12.0,
+                            childAspectRatio: 1.0,
+                          ),
+                          itemCount: usersDocs.length,
+                          itemBuilder: (context, index) {
+                            final userData = usersDocs[index].data();
+                            return _buildUserGridCard(
+                              context: context,
+                              userData: userData,
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
               ),
-              // ↑↑↑↑ 【StreamBuilder ここまで】 ↑↑↑↑
             ),
           ],
         ),
@@ -105,7 +141,7 @@ class _Page_searchState extends State<Page_search> {
     );
   }
 
-  /// 検索バーとフィルターボタン (変更なし)
+  /// 検索バーとフィルターボタン
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -155,13 +191,15 @@ class _Page_searchState extends State<Page_search> {
     // TODO: 'commonPoints' や 'photoCount' もロジックで計算する
 
     return GestureDetector( // ← カード全体をタップ可能にする
-      onTap: () {
+      onTap: () async {
         // ↓↓↓↓ 【ここが「詳しく見る」のロジック】 ↓↓↓↓
         // 遷移先の page_user_profile に、タップした人の 'uid' を渡す
-        Navigator.push(context, MaterialPageRoute(
+        await Navigator.push(context, MaterialPageRoute(
           builder: (context) => Page_user_profile(userId: userData['uid']),
         ));
+        setState(() {});
       },
+
       child: Card(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
         clipBehavior: Clip.antiAlias,
