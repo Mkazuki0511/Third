@@ -30,29 +30,39 @@ class _Page_searchState extends State<Page_search> {
     return age.toString();
   }
 
-  /// --- 自分が既にリクエストした（またはマッチした）相手のIDリストを取得する ---
+  /// --- 自分が既に関わった（送信 or 受信）相手のIDリストを取得する ---
   Future<List<String>> _getInteractedUserIds() async {
     if (_currentUserUid == null) {
       return []; // ログインしてなければ空
     }
 
+    // Set を使うと、IDの重複を自動で防げる
+    final Set<String> interactedUserIds = {};
+
     // 1. 自分が「送信」したリクエスト（いいね！した相手）
-    final requestsSnapshot = await _firestore
+    final sentRequestsSnapshot = await _firestore
         .collection('requests')
         .where('fromId', isEqualTo: _currentUserUid)
         .get();
 
-    // 相手のID (toId) だけをリストに抽出
-    final List<String> requestedUserIds = requestsSnapshot.docs.map((doc) {
-      return doc.data()['toId'] as String;
-    }).toList();
+    for (var doc in sentRequestsSnapshot.docs) {
+      interactedUserIds.add(doc.data()['toId'] as String);
+    }
 
-    // 2. （将来）マッチ済みの相手などもここに追加
+    // 2. 自分が「受信」したリクエスト（いいね！してくれた相手）
+    final receivedRequestsSnapshot = await _firestore
+        .collection('requests')
+        .where('toId', isEqualTo: _currentUserUid)
+        .get();
+
+    for (var doc in receivedRequestsSnapshot.docs) {
+      interactedUserIds.add(doc.data()['fromId'] as String);
+    }
 
     // 3. 自分のIDもリストに追加（自分自身を「探す」に表示しないため）
-    requestedUserIds.add(_currentUserUid!);
+    interactedUserIds.add(_currentUserUid!);
 
-    return requestedUserIds;
+    return interactedUserIds.toList();
   }
   // ↑↑↑↑ 【ロジックここまで】 ↑↑↑↑
 
@@ -175,7 +185,7 @@ class _Page_searchState extends State<Page_search> {
   }
 
   // ↓↓↓↓ 【ここが「新しい」正しいメソッドです】 ↓↓↓↓
-  /// 「With」風の2列グリッド用ユーザーカード
+  /// 2列グリッド用ユーザーカード
   Widget _buildUserGridCard({
     required BuildContext context,
     required Map<String, dynamic> userData,
