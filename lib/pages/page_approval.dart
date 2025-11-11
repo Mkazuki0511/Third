@@ -21,10 +21,21 @@ class _Page_approvalState extends State<Page_approval> {
 
   /// --- 「承認」ロジック ---
   Future<void> _approveRequest(String requestId) async {
+    // 承認を実行する「自分」のIDを取得
+    final String? myId = _auth.currentUser?.uid;
+    // リクエストを送ってきた「相手」のIDを取得
+    final String fromId = (await _firestore.collection('requests').doc(requestId).get()).data()!['fromId'];
+
+    if (myId == null) return; // ログインしていなければ中断
+
     try {
       // 1. requests コレクションの status を 'approved' に更新
       await _firestore.collection('requests').doc(requestId).update({
         'status': 'approved',
+
+        // トークタブでの検索を簡単にするため、参加者リストを追加
+        'participants': [myId, fromId],
+
       });
 
       // TODO: 【フェーズ5.3】
