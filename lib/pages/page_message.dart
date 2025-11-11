@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ← Auth をインポート
-import 'package:cloud_firestore/cloud_firestore.dart'; // ← Firestore をインポート
-// import 'page_chat_room.dart'; // ← 将来作成するチャットルーム
+import 'package:firebase_auth/firebase_auth.dart'; // Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
+import 'page_chat_room.dart'; // チャットルーム
 
 // 状態（読み込みなど）を管理するため StatefulWidget に変更
 class Page_message extends StatefulWidget {
@@ -175,11 +175,14 @@ class _MatchListItemState extends State<_MatchListItem> {
                 ),
 
                 onTap: () {
-                  // 【フェーズ5.3.4】
-                  // ここに個別のチャットルーム(page_chat_room.dart)への遷移を書く
-                  // Navigator.push(context, MaterialPageRoute(
-                  //   builder: (context) => Page_ChatRoom(opponentId: widget.opponentId)
-                  // ));
+                  // ここに個別のチャットルーム(page_chat_room.dart)への遷移
+                  Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => Page_ChatRoom(
+                        opponentId: widget.opponentId, // 相手のIDを渡す
+                        opponentNickname: nickname, // AppBar表示用に名前を渡す
+                        opponentImageUrl: profileImageUrl ?? '', // AppBar表示用に画像URLを渡す
+                      )
+                  ));
                   print("チャットルームへ遷移 -> ${widget.opponentId}");
                 },
               ),
