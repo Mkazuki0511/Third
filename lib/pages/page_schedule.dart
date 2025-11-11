@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // ← Auth をインポート
 import 'package:cloud_firestore/cloud_firestore.dart'; // ← Firestore をインポート
-// import 'page_create_schedule.dart'; // ← 次に作成する「予定作成」ページ
+import 'page_create_schedule.dart'; // ← 「予定作成」ページ
+import 'page_schedule_requests.dart';
 
 class Page_schedule extends StatefulWidget {
   const Page_schedule({super.key});
@@ -11,15 +12,13 @@ class Page_schedule extends StatefulWidget {
 }
 
 class _Page_scheduleState extends State<Page_schedule> {
-  // Firebaseのインスタンス
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // 現在のユーザーID
   final String? _currentUserUid = FirebaseAuth.instance.currentUser?.uid;
 
+  // ↓↓↓↓ 【修正①】初期値を 'true' -> 'false' に変更 ↓↓↓↓
   // 「提供」がtrue、「利用」がfalse
-  bool _isProvidingSelected = true;
+  bool _isProvidingSelected = false; // ← デフォルトを「利用」に
 
   @override
   Widget build(BuildContext context) {
@@ -27,9 +26,22 @@ class _Page_scheduleState extends State<Page_schedule> {
       return const Center(child: Text('ログインしていません'));
     }
 
+    // ↓↓↓↓ 【修正②】このロジックは変更なし（'true' が「提供」のまま） ↓↓↓↓
+    // _isProvidingSelected が false（利用）なら、自分が receiverId
+    // _isProvidingSelected が true（提供）なら、自分が providerId
+    final String filterField = _isProvidingSelected ? 'providerId' : 'receiverId';
+
+    // Stream を定義（15:20の回答のバグ修正を適用済み）
+    final Stream<QuerySnapshot<Map<String, dynamic>>> scheduleStream =
+    _firestore
+        .collection('schedules')
+        .where(filterField, isEqualTo: _currentUserUid)
+        .where('status', isEqualTo: 'approved') // 15:28の計画（承認済みのみ）
+        .orderBy('scheduleAt', descending: true)
+        .snapshots();
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      // ↓↓↓↓ 【AppBarを追加】 ↓↓↓↓
       appBar: AppBar(
         title: const Text('予定'),
         centerTitle: true,
@@ -37,17 +49,28 @@ class _Page_scheduleState extends State<Page_schedule> {
         foregroundColor: Colors.black,
         elevation: 1.0,
         actions: [
-          // 「予定作成」ボタン
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline),
-            onPressed: () {
-              // TODO: 次のステップで「予定作成」ページへ遷移する
-              // Navigator.push(context, MaterialPageRoute(
-              //   builder: (context) => Page_create_schedule(),
-              // ));
-              print("予定作成ページへ（未実装）");
-            },
-          ),
+          // ↓↓↓↓ 【修正③】AppBarのアイコンロジック（15:28の計画） ↓↓↓↓
+          // _isProvidingSelected が true（提供）なら 🔔
+          // _isProvidingSelected が false（利用）なら ＋
+          if (_isProvidingSelected)
+            IconButton(
+              icon: const Icon(Icons.notifications_none), // 鈴 🔔
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(
+                    builder: (context) => const Page_schedule_requests(),
+                ));
+              },
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline), // ＋
+              onPressed: () {
+                // 「予定作成」ページへ遷移
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => const Page_create_schedule(),
+                ));
+              },
+            ),
         ],
       ),
       body: Column(
@@ -55,35 +78,25 @@ class _Page_scheduleState extends State<Page_schedule> {
           const SizedBox(height: 24),
           _buildToggleButtons(), // 「提供」「利用」のトグルボタン
 
-          // ↓↓↓↓ 【ここからがロジック本体】 ↓↓↓↓
           Expanded(
-            // 1. StreamBuilderで「予定」を監視
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: _firestore
-                  .collection('schedules') // ← 新しいコレクション
-                  .where('participants', arrayContains: _currentUserUid) // 自分（のID）が参加している
-              // TODO: .where('status', isEqualTo: 'upcoming') // （将来）「予約確定」のものだけ
-                  .orderBy('scheduleAt', descending: true) // 予定の日時が新しい順
-                  .snapshots(),
-
+              stream: scheduleStream, // ← 修正済みの stream を渡す
               builder: (context, scheduleSnapshot) {
-                // 読み込み中
+                // ... (読み込み中、エラー、0件のUIは変更なし) ...
                 if (scheduleSnapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                // エラー
                 if (scheduleSnapshot.hasError) {
+                  // (インデックス作成のURLが表示されるはずです)
                   return Center(child: Text('エラー: ${scheduleSnapshot.error}'));
                 }
-                // 予定 0件
                 if (!scheduleSnapshot.hasData || scheduleSnapshot.data!.docs.isEmpty) {
                   return const Center(child: Text('予定はありません'));
                 }
 
-                // 2. 成功！予定のリストを取得
+                // 成功！
                 final scheduleDocs = scheduleSnapshot.data!.docs;
 
-                // 3. ListView で予定カードを一覧表示
                 return ListView.builder(
                   padding: const EdgeInsets.all(16.0),
                   itemCount: scheduleDocs.length,
@@ -91,13 +104,11 @@ class _Page_scheduleState extends State<Page_schedule> {
                     final scheduleData = scheduleDocs[index].data();
                     final List<dynamic> participants = scheduleData['participants'];
 
-                    // 4. 「相手」のIDを特定する
                     final String opponentId = participants.firstWhere(
-                          (id) => id != _currentUserUid, // 自分じゃないほうが相手
+                          (id) => id != _currentUserUid,
                       orElse: () => '',
                     );
 
-                    // 5. 「相手のID」と「予定データ」を使って、カードを表示
                     return _ScheduleCardItem(
                       opponentId: opponentId,
                       scheduleData: scheduleData,
@@ -107,34 +118,35 @@ class _Page_scheduleState extends State<Page_schedule> {
               },
             ),
           ),
-          // ↑↑↑↑ 【ロジックここまで】 ↑↑↑↑
         ],
       ),
     );
   }
 
-  /// 「提供」「利用」のトグルボタン (変更なし)
+  /// 「提供」「利用」のトグルボタン
   Widget _buildToggleButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Row(
         children: [
+          // ↓↓↓↓ 【修正④】「利用」ボタンを左（1番目）に配置 ↓↓↓↓
           _buildToggleButton(
-            text: '提供',
-            isSelected: _isProvidingSelected,
+            text: '利用',
+            isSelected: !_isProvidingSelected, // 'false' の時に選択状態
             onPressed: () {
               setState(() {
-                _isProvidingSelected = true;
+                _isProvidingSelected = false; // 'false' をセット
               });
             },
           ),
           const SizedBox(width: 12),
+          // ↓↓↓↓ 【修正⑤】「提供」ボタンを右（2番目）に配置 ↓↓↓↓
           _buildToggleButton(
-            text: '利用',
-            isSelected: !_isProvidingSelected,
+            text: '提供',
+            isSelected: _isProvidingSelected, // 'true' の時に選択状態
             onPressed: () {
               setState(() {
-                _isProvidingSelected = false;
+                _isProvidingSelected = true; // 'true' をセット
               });
             },
           ),
