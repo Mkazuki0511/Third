@@ -9,8 +9,6 @@ import 'package:third/pages/page_approval.dart';
 import 'package:third/pages/page_schedule.dart';
 import 'firebase_options.dart';
 import 'package:third/sub/pages/page_profile.edit.dart';
-import 'package:provider/provider.dart';
-import '../providers/profile_provider.dart';
 
 
 void main() async {
@@ -19,12 +17,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ProfileProvider()),
-      ],
-      child: const MyApp(),
-    ),
+    const MyApp(),
   );
 }
 
