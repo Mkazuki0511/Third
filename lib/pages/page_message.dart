@@ -96,8 +96,6 @@ class _Page_messageState extends State<Page_message> {
 }
 
 
-
-// --- ↓↓↓↓ 【ここからが新設ウィジェット】 ↓↓↓↓ ---
 /// --- マッチ相手の情報を表示するリストアイテム（`Talk.png` のUI） ---
 class _MatchListItem extends StatefulWidget {
   final String opponentId;
@@ -112,14 +110,28 @@ class _MatchListItemState extends State<_MatchListItem> {
   // 相手のユーザーデータを `Future` で1回だけ取得
   late Future<DocumentSnapshot<Map<String, dynamic>>> _userDataFuture;
 
+  // Firebaseのインスタンス
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // チャットルームID
+  late String _chatRoomId;
+  late String _myId;
+
   @override
   void initState() {
     super.initState();
-    // 6. `opponentId` を使って、'users' コレクションから相手のデータを取得
+    // 1. `opponentId` を使って、'users' コレクションから相手のデータを取得
     _userDataFuture = FirebaseFirestore.instance
         .collection('users')
         .doc(widget.opponentId)
         .get();
+
+    // 2. チャットルームIDを（page_chat_room と同じロジックで）生成
+    _myId = _auth.currentUser!.uid;
+    List<String> ids = [_myId, widget.opponentId];
+    ids.sort(); // アルファベット順に並び替え
+    _chatRoomId = ids.join('_'); // 結合
   }
 
   @override
@@ -168,10 +180,32 @@ class _MatchListItemState extends State<_MatchListItem> {
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
 
-                // TODO: 最後のメッセージをここに表示
-                subtitle: const Text(
-                  'よろしくお願いします！', // (今はまだダミー)
-                  overflow: TextOverflow.ellipsis,
+                // 最後のメッセージをここに表示
+                subtitle: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  // 3. chat_rooms -> (ID) -> messages を監視
+                  stream: _firestore
+                      .collection('chat_rooms')
+                      .doc(_chatRoomId)
+                      .collection('messages')
+                      .orderBy('createdAt', descending: true) // 新しい順
+                      .limit(1) // 最後の1件だけ
+                      .snapshots(),
+
+                  builder: (context, messageSnapshot) {
+                    // 4. 最後のメッセージを表示
+                    if (messageSnapshot.hasData && messageSnapshot.data!.docs.isNotEmpty) {
+                      final lastMessage = messageSnapshot.data!.docs.first.data();
+                      return Text(
+                        lastMessage['text'] ?? '', // メッセージ本文
+                        overflow: TextOverflow.ellipsis,
+                      );
+                    }
+                    // まだメッセージがない場合
+                    return const Text(
+                      'マッチしました！', // ダミーの代わりに
+                      overflow: TextOverflow.ellipsis,
+                    );
+                  },
                 ),
 
                 onTap: () {
