@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// ↑ `page_profile.dart` と同じく、Auth と Firestore をインポートします
+import 'page_profile_editor.dart';
 
 class Page_profile_edit extends StatelessWidget {
   const Page_profile_edit({super.key});
@@ -194,8 +194,10 @@ class Page_profile_edit extends StatelessWidget {
       child: SafeArea(
         child: ElevatedButton.icon(
           onPressed: () {
-            // TODO: プロフィール「編集」ロジックへ
-            // (例: page_onboarding_step4 を再利用して編集させるなど)
+            // 「編集フォーム」ページへ遷移
+            Navigator.push(context, MaterialPageRoute(
+                builder: (context) => const Page_Profile_Editor(),
+            ));
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.cyan, // with-....-0.webp の色
