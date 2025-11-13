@@ -65,12 +65,14 @@ class _Page_onboarding_step4State extends State<Page_onboarding_step4> {
         'learnSkill': _learnSkillController.text.trim(),
         'teachSkill': _teachSkillController.text.trim(),
         'selfIntroduction': _selfIntroController.text.trim(),
-
-        // 新しく選択されたロジックのデータを保存
         'learnSkillLevel': _learnSkillLevel,
         'teachSkillLevel': _teachSkillLevel,
         'exchangeMethod': _exchangeMethod,
         'availableTime': _availableTime,
+
+        'tickets': 3, // ← 初期チケットとして 3枚 を付与
+        'rank': 'beginner', // ← 初期ランク
+        'experiencePoints': 0, // ← 経験値の初期値を設定
       };
 
       // 3. Firestoreのユーザー情報を更新 (update)

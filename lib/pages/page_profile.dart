@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ← Auth をインポート
-import 'package:cloud_firestore/cloud_firestore.dart'; // ← Firestore をインポート
+import 'package:firebase_auth/firebase_auth.dart'; // Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
 import 'package:third/sub/pages/page_profile.edit.dart'; // 「プロフィールを確認・編集」
 
 class Page_profile extends StatelessWidget {
@@ -53,12 +53,9 @@ class Page_profile extends StatelessWidget {
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    // ↓↓↓↓ 【ここがロジック】 データを渡す ↓↓↓↓
-                    // _buildHeader に (context, userData) を渡す
                     _buildHeader(context, userData),
                     const SizedBox(height: 16),
-
-                    // ↓↓↓↓ 【注意】以下の項目はまだダミーデータです ↓↓↓↓
+                    // データを渡す
                     _buildRankCard(userData),
                     const SizedBox(height: 16),
                     _buildBadgesCard(userData),
@@ -80,6 +77,11 @@ class Page_profile extends StatelessWidget {
     // Firestoreから nickname と profileImageUrl を取得
     final String nickname = userData['nickname'] ?? '名前なし';
     final String? profileImageUrl = userData['profileImageUrl']; // null の可能性がある
+    // Firestoreから tickets と plan を取得
+    final int tickets = userData['tickets'] ?? 0; // チケット数
+    final String plan = userData['plan'] ?? '無料'; // 将来のプラン用 (今はダミー)
+    // (提供サービス数は、Firestoreに 'teachSkill' があるかどうかで判定もできますが、
+    //  Account.png に合わせ、今はまだダミーの '2' を使います)
 
     return Column(
       children: [
@@ -91,7 +93,6 @@ class Page_profile extends StatelessWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            // ↓↓↓↓ 【修正】CircleAvatar をロジック化 ↓↓↓↓
             CircleAvatar(
               radius: 40,
               backgroundColor: Colors.grey[300],
@@ -110,9 +111,9 @@ class Page_profile extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildStatColumn('5', '残チケット'),
-                  _buildStatColumn('無料', 'プラン'),
-                  _buildStatColumn('2', '提供サービス'),
+                  _buildStatColumn(tickets.toString(), '残チケット'), // 本物のデータ
+                  _buildStatColumn(plan, 'プラン'), // ダミー
+                  _buildStatColumn('1', '提供サービス'), // ダミー
                 ],
               ),
             ),
@@ -144,7 +145,7 @@ class Page_profile extends StatelessWidget {
     );
   }
 
-  /// 統計表示用の共通ウィジェット (変更なし)
+  /// 統計表示用の共通ウィジェット
   Widget _buildStatColumn(String value, String label) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -156,9 +157,16 @@ class Page_profile extends StatelessWidget {
     );
   }
 
-  /// ランクカード (まだダミー)
+  /// ランクカード
   Widget _buildRankCard(Map<String, dynamic> userData) {
-    // TODO: 将来 userData からランク情報を取得する
+    // Firestoreから rank と experiencePoints を取得
+    final String rank = userData['rank'] ?? 'Beginner'; // 本物のランク
+    final int exp = userData['experiencePoints'] ?? 0 ; // 本物の経験値
+
+    // (ランクアップに必要な経験値のロジック（仮）)
+    final int nextRankExp = 1000; // (例: 次は1000必要)
+    final double progress = (exp / nextRankExp).clamp(0.0, 1.0);
+
     return Card(
       color: Colors.yellow[100],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -168,8 +176,8 @@ class Page_profile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Center(
-              child: Text('ゴールドランク', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Center(
+              child: Text(rank, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 16),
             Row(
@@ -181,16 +189,16 @@ class Page_profile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            // プログレスバー（ダミー）
+            // プログレスバー
             LinearProgressIndicator(
-              value: 0.8,
+              value: progress,
               backgroundColor: Colors.grey[300],
               color: Colors.orange,
               minHeight: 10,
               borderRadius: BorderRadius.circular(5),
             ),
             const SizedBox(height: 8),
-            const Center(child: Text('あと1000exでプラチナランク', style: TextStyle(fontSize: 12))),
+            Center(child: Text('あと ${nextRankExp - exp} exでプラチナランク', style: const TextStyle(fontSize: 12))),
           ],
         ),
       ),
