@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
 import 'page_create_schedule.dart'; // ← 「予定作成」ページ
 import 'page_schedule_requests.dart';
 import 'page_evaluation_receiver.dart'; // 利用者が評価
-// import 'page_evaluation_provider.dart'; // 提供者が評価
+import 'page_evaluation_provider.dart'; // 提供者が評価
 
 class Page_schedule extends StatefulWidget {
   const Page_schedule({super.key});
@@ -394,18 +394,17 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                           // isProviderView の状態に応じて、遷移先を切り替える
                           if (widget.isProviderView) {
                             // 「提供」タブなので、"利用者の姿勢"を評価するページへ
-                            // Navigator.push(context, MaterialPageRoute(
-                            //   builder: (context) => Page_Evaluation_Provider(
-                            //     scheduleId: widget.scheduleId, // ← 修正
-                            //     opponentId: widget.opponentId,
-                            //   ),
-                            // ));
-                            print("提供者用の評価ページへ（未実装）");
+                            Navigator.push(context, MaterialPageRoute(
+                            builder: (context) => Page_Evaluation_Provider(
+                            scheduleId: widget.scheduleId,
+                            opponentId: widget.opponentId,
+                            ),
+                            ));
                           } else {
                             // 「利用」タブなので、"サービス"を評価するページへ
                             Navigator.push(context, MaterialPageRoute(
                                 builder: (context) => Page_Evaluation_Receiver(
-                              scheduleId: widget.scheduleId, // ← 修正
+                              scheduleId: widget.scheduleId, 
                               opponentId: widget.opponentId,
                                 ),
                             ));
