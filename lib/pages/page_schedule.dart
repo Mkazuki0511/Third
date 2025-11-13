@@ -112,6 +112,7 @@ class _Page_scheduleState extends State<Page_schedule> {
                     return _ScheduleCardItem(
                       opponentId: opponentId,
                       scheduleData: scheduleData,
+                      isProviderView: _isProvidingSelected,
                     );
                   },
                 );
@@ -183,10 +184,12 @@ class _Page_scheduleState extends State<Page_schedule> {
 class _ScheduleCardItem extends StatefulWidget {
   final String opponentId;
   final Map<String, dynamic> scheduleData;
+  final bool isProviderView;
 
   const _ScheduleCardItem({
     required this.opponentId,
     required this.scheduleData,
+    required this.isProviderView,
   });
 
   @override
@@ -339,8 +342,13 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('ご利用サービス', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+                                Text(widget.isProviderView
+                                    ? '提供サービス'
+                                    : 'ご利用サービス',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey[700])
+                                ),
                                 const SizedBox(height: 4),
+
                                 Text(
                                     service, // ← 本物のサービス名に
                                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)
@@ -376,11 +384,16 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                           // ));
                           print("評価ページへ（未実装）");
                         },
-                        child: const Text('サービスを評価する'),
+                          // ↓↓↓↓ 【テキストを動的に変更】 ↓↓↓↓
+                          child: Text(
+                          // 親から渡された `isProviderView` でテキストを切り替える
+                          widget.isProviderView
+                            ? '利用者の姿勢を評価する' // True (提供タブ)
+                            : 'サービスを評価する', // False (利用タブ)
                       ),
                     ),
                   ),
-
+                ),
               ],
             ),
           ),
