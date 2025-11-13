@@ -257,7 +257,17 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
         final Timestamp? scheduleAt = widget.scheduleData['scheduleAt'];
         final String service = widget.scheduleData['serviceName'] ?? 'スキル交換'; // (例: "プログラミング講座")
 
-        // 10. UIを構築 (Schedule_2.png のデザイン)
+        // 10. 「評価する」ボタンを表示するかどうかを判定
+        bool showEvaluateButton = false;
+        // (ロジック： ステータスが「承認済み」 AND 予定日時が「過去」)
+        if (status == 'approved' &&
+            scheduleAt != null &&
+            scheduleAt.toDate().isBefore(DateTime.now())) {
+          showEvaluateButton = true;
+          // TODO: 将来的には、'isEvaluated: true' なら非表示にするロジックも追加
+        }
+
+        // 11. UIを構築 (Schedule_2.png のデザイン)
         final Color statusColor = (status == '予約確定') ? Colors.cyan : Colors.grey;
 
         return Card(
@@ -343,6 +353,34 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                     ),
                   ],
                 ),
+
+                // 12. 「評価する」ボタンを条件付きで表示
+                if (showEvaluateButton)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange, // 評価ボタンの色
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          // 【ステップ6.3.5】
+                          // TODO: 評価ページ (page_evaluation.dart) へ遷移
+                          // Navigator.push(context, MaterialPageRoute(
+                          //   builder: (context) => Page_Evaluation(
+                          //     scheduleId: widget.scheduleData.id, // (IDの渡し方を要検討)
+                          //     opponentId: widget.opponentId,
+                          //   ),
+                          // ));
+                          print("評価ページへ（未実装）");
+                        },
+                        child: const Text('サービスを評価する'),
+                      ),
+                    ),
+                  ),
+
               ],
             ),
           ),
