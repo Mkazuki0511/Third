@@ -374,16 +374,30 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                           foregroundColor: Colors.white,
                         ),
                         onPressed: () {
-                          // 【ステップ6.3.5】
-                          // TODO: 評価ページ (page_evaluation.dart) へ遷移
-                          // Navigator.push(context, MaterialPageRoute(
-                          //   builder: (context) => Page_Evaluation(
-                          //     scheduleId: widget.scheduleData.id, // (IDの渡し方を要検討)
-                          //     opponentId: widget.opponentId,
-                          //   ),
-                          // ));
-                          print("評価ページへ（未実装）");
+                          // isProviderView の状態に応じて、遷移先を切り替える
+                          if (widget.isProviderView) {
+                            // 「提供」タブなので、"利用者の姿勢"を評価するページ へ
+                            Navigator.push(context, MaterialPageRoute(
+                              // TODO: Step 6.3.5 で Page_Evaluation_Provider を作成する
+                              // builder: (context) => const Page_Evaluation_Provider(
+                              //   scheduleId: widget.scheduleData.id,
+                              //   opponentId: widget.opponentId,
+                              // ),
+                              builder: (context) => Scaffold(appBar: AppBar(title: const Text('提供者が利用者を評価 [review_provider.png]'))), // ← 仮の遷移先
+                            ));
+                          } else {
+                            // 「利用」タブなので、"サービス"を評価するページ へ
+                            Navigator.push(context, MaterialPageRoute(
+                              // TODO: Step 6.3.5 で Page_Evaluation_Receiver を作成する
+                              // builder: (context) => const Page_Evaluation_Receiver(
+                              //   scheduleId: widget.scheduleData.id,
+                              //   opponentId: widget.opponentId,
+                              // ),
+                              builder: (context) => Scaffold(appBar: AppBar(title: const Text('利用者が提供者を評価 [review.png]'))), // ← 仮の遷移先
+                            ));
+                          }
                         },
+                        
                           // ↓↓↓↓ 【テキストを動的に変更】 ↓↓↓↓
                           child: Text(
                           // 親から渡された `isProviderView` でテキストを切り替える
