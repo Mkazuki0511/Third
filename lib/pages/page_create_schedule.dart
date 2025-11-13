@@ -117,10 +117,23 @@ class _Page_create_scheduleState extends State<Page_create_schedule> {
       );
       return;
     }
+    // ログインチェック
+    if (_currentUserUid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('エラー: ログインしていません')),
+      );
+      return;
+    }
 
     setState(() { _isLoading = true; });
 
     try {
+      // 2. トランザクションの「外」で、必要な情報を準備する
+
+      // 保存する「場所」のリファレンス（住所）
+      final userDocRef = _firestore.collection('users').doc(_currentUserUid!);
+      final newScheduleDocRef = _firestore.collection('schedules').doc(); // 新しい予定のIDを先に作成
+
       // 選択した日付と時間を `DateTime` に結合し、`Timestamp` に変換
       final DateTime scheduleDateTime = DateTime(
         _selectedDate!.year,
@@ -132,17 +145,43 @@ class _Page_create_scheduleState extends State<Page_create_schedule> {
       final Timestamp scheduleTimestamp = Timestamp.fromDate(scheduleDateTime);
 
       // 'schedules' コレクションに新しいドキュメントを追加
-      await _firestore.collection('schedules').add({
+      final Map<String, dynamic> newScheduleData = {
         'status': 'pending',
         'serviceName': _serviceController.text.trim(),
         'scheduleAt': scheduleTimestamp,
         'participants': [_currentUserUid, _selectedOpponentId],
         'createdAt': FieldValue.serverTimestamp(),
-
         'receiverId': _currentUserUid,       // 利用する人 (自分) = 申請者
         'providerId': _selectedOpponentId, // 提供する人 (相手) = 承認者
+      };
+
+      // 3. トランザクションを実行
+      await _firestore.runTransaction((transaction) async {
+        // 3a. 【読み込み】まず、安全に「自分の」ドキュメントを読み込む
+        final DocumentSnapshot userDoc = await transaction.get(userDocRef);
+
+        if (!userDoc.exists) {
+          throw Exception("ユーザーデータが見つかりません。");
+        }
+
+        // 3b. 【確認】チケットが1枚以上あるか確認する
+        final int currentTickets = userDoc.data().toString().contains('tickets') ? userDoc.get('tickets') : 0;
+
+        if (currentTickets < 1) {
+          // チケットが0枚なら、Exceptionを投げてトランザクションを失敗させる
+          throw Exception('チケットがありません。');
+        }
+
+        // 3c. 【書き込み①】チケットを1枚消費する
+        transaction.update(userDocRef, {
+          'tickets': FieldValue.increment(-1)
+        });
+
+        // 3d. 【書き込み②】新しい予定を作成する
+        transaction.set(newScheduleDocRef, newScheduleData);
       });
 
+      // 4. すべて成功
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('予定を申請しました！')),
