@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ← Auth をインポート
-import 'package:cloud_firestore/cloud_firestore.dart'; // ← Firestore をインポート
+import 'package:firebase_auth/firebase_auth.dart'; // Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
 import 'page_create_schedule.dart'; // ← 「予定作成」ページ
 import 'page_schedule_requests.dart';
+import 'page_evaluation_receiver.dart'; // 利用者が評価
+// import 'page_evaluation_provider.dart'; // 提供者が評価
 
 class Page_schedule extends StatefulWidget {
   const Page_schedule({super.key});
@@ -102,8 +104,8 @@ class _Page_scheduleState extends State<Page_schedule> {
                   itemCount: scheduleDocs.length,
                   itemBuilder: (context, index) {
                     final scheduleData = scheduleDocs[index].data();
+                    final String scheduleId = scheduleDocs[index].id;
                     final List<dynamic> participants = scheduleData['participants'];
-
                     final String opponentId = participants.firstWhere(
                           (id) => id != _currentUserUid,
                       orElse: () => '',
@@ -112,6 +114,7 @@ class _Page_scheduleState extends State<Page_schedule> {
                     return _ScheduleCardItem(
                       opponentId: opponentId,
                       scheduleData: scheduleData,
+                      scheduleId: scheduleId,
                       isProviderView: _isProvidingSelected,
                     );
                   },
@@ -185,11 +188,13 @@ class _ScheduleCardItem extends StatefulWidget {
   final String opponentId;
   final Map<String, dynamic> scheduleData;
   final bool isProviderView;
+  final String scheduleId;
 
   const _ScheduleCardItem({
     required this.opponentId,
     required this.scheduleData,
     required this.isProviderView,
+    required this.scheduleId,
   });
 
   @override
@@ -262,12 +267,24 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
 
         // 10. 「評価する」ボタンを表示するかどうかを判定
         bool showEvaluateButton = false;
-        // (ロジック： ステータスが「承認済み」 AND 予定日時が「過去」)
         if (status == 'approved' &&
             scheduleAt != null &&
             scheduleAt.toDate().isBefore(DateTime.now())) {
           showEvaluateButton = true;
-          // TODO: 将来的には、'isEvaluated: true' なら非表示にするロジックも追加
+
+          if (widget.isProviderView) {
+            // 提供タブの場合： "isEvaluatedByProvider" をチェック
+            if (widget.scheduleData.containsKey('isEvaluatedByProvider') &&
+                widget.scheduleData['isEvaluatedByProvider'] == true) {
+              showEvaluateButton = false;
+            }
+          } else {
+            // 利用タブの場合： "isEvaluatedByReceiver" をチェック
+            if (widget.scheduleData.containsKey('isEvaluatedByReceiver') &&
+                widget.scheduleData['isEvaluatedByReceiver'] == true) {
+              showEvaluateButton = false;
+            }
+          }
         }
 
         // 11. UIを構築 (Schedule_2.png のデザイン)
@@ -376,28 +393,25 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                         onPressed: () {
                           // isProviderView の状態に応じて、遷移先を切り替える
                           if (widget.isProviderView) {
-                            // 「提供」タブなので、"利用者の姿勢"を評価するページ へ
-                            Navigator.push(context, MaterialPageRoute(
-                              // TODO: Step 6.3.5 で Page_Evaluation_Provider を作成する
-                              // builder: (context) => const Page_Evaluation_Provider(
-                              //   scheduleId: widget.scheduleData.id,
-                              //   opponentId: widget.opponentId,
-                              // ),
-                              builder: (context) => Scaffold(appBar: AppBar(title: const Text('提供者が利用者を評価 [review_provider.png]'))), // ← 仮の遷移先
-                            ));
+                            // 「提供」タブなので、"利用者の姿勢"を評価するページへ
+                            // Navigator.push(context, MaterialPageRoute(
+                            //   builder: (context) => Page_Evaluation_Provider(
+                            //     scheduleId: widget.scheduleId, // ← 修正
+                            //     opponentId: widget.opponentId,
+                            //   ),
+                            // ));
+                            print("提供者用の評価ページへ（未実装）");
                           } else {
-                            // 「利用」タブなので、"サービス"を評価するページ へ
+                            // 「利用」タブなので、"サービス"を評価するページへ
                             Navigator.push(context, MaterialPageRoute(
-                              // TODO: Step 6.3.5 で Page_Evaluation_Receiver を作成する
-                              // builder: (context) => const Page_Evaluation_Receiver(
-                              //   scheduleId: widget.scheduleData.id,
-                              //   opponentId: widget.opponentId,
-                              // ),
-                              builder: (context) => Scaffold(appBar: AppBar(title: const Text('利用者が提供者を評価 [review.png]'))), // ← 仮の遷移先
+                                builder: (context) => Page_Evaluation_Receiver(
+                              scheduleId: widget.scheduleId, // ← 修正
+                              opponentId: widget.opponentId,
+                                ),
                             ));
                           }
                         },
-                        
+
                           // ↓↓↓↓ 【テキストを動的に変更】 ↓↓↓↓
                           child: Text(
                           // 親から渡された `isProviderView` でテキストを切り替える
