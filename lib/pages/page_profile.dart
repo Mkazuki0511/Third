@@ -172,7 +172,14 @@ class Page_profile extends StatelessWidget {
 
     final int serviceCount = userData['servicesProvidedCount'] ?? 0;
     final int serviceUsedCount = userData['servicesUsedCount'] ?? 0;
-    final double averageRating = 4.5;
+
+    final double totalRating = (userData['totalRating'] ?? 0).toDouble(); //　累計評価点の取得
+    final int ratingCount = userData['ratingCount'] ?? 0; //　評価回数 を取得
+
+    // 0除算を避けて、「平均満足度」を計算
+    final double averageRating = (ratingCount == 0)
+        ? 0.0 // まだ誰も評価していない
+        : totalRating / ratingCount;
 
     return Card(
       color: Colors.yellow[100],
@@ -191,7 +198,8 @@ class Page_profile extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildStatColumn(serviceCount.toString(), '提供回数'),
-                _buildStatColumn(averageRating.toString(), '平均満足度'),
+                // 4.5 -> 割り算した結果 (小数点1桁で表示)
+                _buildStatColumn(averageRating.toStringAsFixed(1), '平均満足度'),
                 _buildStatColumn(serviceUsedCount.toString(), '利用回数'),
               ],
             ),

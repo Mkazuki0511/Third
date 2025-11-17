@@ -55,19 +55,20 @@ class _Page_Evaluation_ReceiverState extends State<Page_Evaluation_Receiver> {
       final receiverUserDocRef = _firestore.collection('users').doc(_auth.currentUser!.uid);
       final scheduleDocRef = _firestore.collection('schedules').doc(widget.scheduleId);
       final evalDocRef = _firestore.collection('evaluations').doc();
-
+      final double totalStars = (_ratingQ1 + _ratingQ2 + _ratingQ3)/3 ; // Q1, Q2, Q3 の星の合計点を計算
       await _firestore.runTransaction((transaction) async {
         // (トランザクション内でランク計算のためのデータを先に取得しても良いが、
         //  まずはシンプルに「書き込み」だけを実行します)
-
         // 3a. 提供者の 'users' ドキュメントを更新
         transaction.update(providerUserDocRef, {
           'tickets': FieldValue.increment(1), // スキル提供でチケットを1枚獲得
           'experiencePoints': FieldValue.increment(100), // 経験値を100獲得 (仮)
           'servicesProvidedCount': FieldValue.increment(1), // 「提供回数」を +1
+          'totalRating': FieldValue.increment(totalStars), // 累計評価点を加算
+          'ratingCount': FieldValue.increment(1),       // 評価回数を +1
           // TODO: 経験値(exp)に応じて 'rank' も 'Learner' に更新するロジック
         });
-        
+
         // 3b. 利用者(自分)の 'users' ドキュメントを更新
         transaction.update(receiverUserDocRef, {
           'servicesUsedCount': FieldValue.increment(1), // 「利用回数」を +1
