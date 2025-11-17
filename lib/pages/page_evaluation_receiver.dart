@@ -64,9 +64,10 @@ class _Page_Evaluation_ReceiverState extends State<Page_Evaluation_Receiver> {
         transaction.update(providerUserDocRef, {
           'tickets': FieldValue.increment(1), // スキル提供でチケットを1枚獲得
           'experiencePoints': FieldValue.increment(100), // 経験値を100獲得 (仮)
+          'servicesProvidedCount': FieldValue.increment(1), // 「提供回数」を +1
           // TODO: 経験値(exp)に応じて 'rank' も 'Learner' に更新するロジック
         });
-
+        
         // 3b. 利用者(自分)の 'users' ドキュメントを更新
         transaction.update(receiverUserDocRef, {
           'servicesUsedCount': FieldValue.increment(1), // 「利用回数」を +1
