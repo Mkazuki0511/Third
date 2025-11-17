@@ -404,7 +404,7 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                             // 「利用」タブなので、"サービス"を評価するページへ
                             Navigator.push(context, MaterialPageRoute(
                                 builder: (context) => Page_Evaluation_Receiver(
-                              scheduleId: widget.scheduleId, 
+                              scheduleId: widget.scheduleId,
                               opponentId: widget.opponentId,
                                 ),
                             ));

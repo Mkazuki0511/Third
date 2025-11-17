@@ -79,9 +79,12 @@ class Page_profile extends StatelessWidget {
     final String? profileImageUrl = userData['profileImageUrl']; // null の可能性がある
     // Firestoreから tickets と plan を取得
     final int tickets = userData['tickets'] ?? 0; // チケット数
-    final String plan = userData['plan'] ?? '無料'; // 将来のプラン用 (今はダミー)
-    // (提供サービス数は、Firestoreに 'teachSkill' があるかどうかで判定もできますが、
-    //  Account.png に合わせ、今はまだダミーの '2' を使います)
+    final String plan = userData['plan'] ?? '無料';
+
+    final String teachSkill = userData['teachSkill'] ?? '';
+    final String service = (teachSkill.isNotEmpty) ? '1' : '0';
+
+    final int serviceCount = userData['servicesProvidedCount'] ?? 0;
 
     return Column(
       children: [
@@ -113,7 +116,7 @@ class Page_profile extends StatelessWidget {
                 children: [
                   _buildStatColumn(tickets.toString(), '残チケット'), // 本物のデータ
                   _buildStatColumn(plan, 'プラン'), // ダミー
-                  _buildStatColumn('1', '提供サービス'), // ダミー
+                  _buildStatColumn(service, '提供サービス'),
                 ],
               ),
             ),
@@ -167,6 +170,10 @@ class Page_profile extends StatelessWidget {
     final int nextRankExp = 1000; // (例: 次は1000必要)
     final double progress = (exp / nextRankExp).clamp(0.0, 1.0);
 
+    final int serviceCount = userData['servicesProvidedCount'] ?? 0;
+    final int serviceUsedCount = userData['servicesUsedCount'] ?? 0;
+    final double averageRating = 4.5;
+
     return Card(
       color: Colors.yellow[100],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -183,9 +190,9 @@ class Page_profile extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStatColumn('10', '提供回数'),
-                _buildStatColumn('4.5', '平均満足度'),
-                _buildStatColumn('10', '利用回数'),
+                _buildStatColumn(serviceCount.toString(), '提供回数'),
+                _buildStatColumn(averageRating.toString(), '平均満足度'),
+                _buildStatColumn(serviceUsedCount.toString(), '利用回数'),
               ],
             ),
             const SizedBox(height: 16),

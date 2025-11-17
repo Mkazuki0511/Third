@@ -51,24 +51,25 @@ class _Page_Evaluation_ReceiverState extends State<Page_Evaluation_Receiver> {
     setState(() { _isLoading = true; });
 
     try {
-      // 【あなたのルール 17:34】
-      // 「提供者」の experiencePoints と tickets を更新するための
-      // トランザクションを実行します。
-
-      // 1. 提供者(opponent)の 'users' ドキュメントの参照
-      final userDocRef = _firestore.collection('users').doc(widget.opponentId);
-      // 2. 評価した 'schedules' ドキュメントの参照
+      final providerUserDocRef = _firestore.collection('users').doc(widget.opponentId);
+      final receiverUserDocRef = _firestore.collection('users').doc(_auth.currentUser!.uid);
       final scheduleDocRef = _firestore.collection('schedules').doc(widget.scheduleId);
+      final evalDocRef = _firestore.collection('evaluations').doc();
 
       await _firestore.runTransaction((transaction) async {
         // (トランザクション内でランク計算のためのデータを先に取得しても良いが、
         //  まずはシンプルに「書き込み」だけを実行します)
 
         // 3a. 提供者の 'users' ドキュメントを更新
-        transaction.update(userDocRef, {
+        transaction.update(providerUserDocRef, {
           'tickets': FieldValue.increment(1), // スキル提供でチケットを1枚獲得
           'experiencePoints': FieldValue.increment(100), // 経験値を100獲得 (仮)
           // TODO: 経験値(exp)に応じて 'rank' も 'Learner' に更新するロジック
+        });
+
+        // 3b. 利用者(自分)の 'users' ドキュメントを更新
+        transaction.update(receiverUserDocRef, {
+          'servicesUsedCount': FieldValue.increment(1), // 「利用回数」を +1
         });
 
         // 3b. 'schedules' ドキュメントに「利用者側の評価が完了した」フラグを立てる
@@ -78,7 +79,7 @@ class _Page_Evaluation_ReceiverState extends State<Page_Evaluation_Receiver> {
 
         // 3c. (オプション) 評価自体も 'evaluations' コレクションに保存する
         // (これにより「平均満足度」などを計算できるようになります)
-        transaction.set(_firestore.collection('evaluations').doc(), {
+        transaction.set(evalDocRef, {
           'scheduleId': widget.scheduleId,
           'evaluatorId': _auth.currentUser!.uid, // 評価者 (自分)
           'targetId': widget.opponentId,       // 被評価者 (提供者)

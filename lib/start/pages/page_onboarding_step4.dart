@@ -70,9 +70,10 @@ class _Page_onboarding_step4State extends State<Page_onboarding_step4> {
         'exchangeMethod': _exchangeMethod,
         'availableTime': _availableTime,
 
-        'tickets': 3, // ← 初期チケットとして 3枚 を付与
-        'rank': 'beginner', // ← 初期ランク
-        'experiencePoints': 0, // ← 経験値の初期値を設定
+        'tickets': 3, // 初期チケットとして 3枚 を付与
+        'rank': 'beginner', // 初期ランク
+        'experiencePoints': 0, // 経験値の初期値を設定
+        'servicesProvidedCount': 0, // 「提供回数」の初期値 0 を追加
       };
 
       // 3. Firestoreのユーザー情報を更新 (update)

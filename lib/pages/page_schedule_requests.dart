@@ -14,23 +14,32 @@ class Page_schedule_requests extends StatefulWidget {
 class _Page_schedule_requestsState extends State<Page_schedule_requests> {
   // Firebaseのインスタンス
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // 現在のユーザーID
   final String? _currentUserUid = FirebaseAuth.instance.currentUser?.uid;
 
   /// --- 「承認」ロジック ---
   Future<void> _approveSchedule(String scheduleId) async {
+    final String? myId = _auth.currentUser?.uid;
+    final String receiverId = (await _firestore.collection('schedules').doc(scheduleId).get()).data()!['receiverId'];
+
+    if (myId == null) return;
+
     try {
-      // 1. schedules コレクションの status を 'approved' に更新
+      // トランザクション -> シンプルな update に戻す
+      // (servicesUsedCount の +1 を削除したため)
       await _firestore.collection('schedules').doc(scheduleId).update({
         'status': 'approved',
       });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('予定を承認しました！')),
+          const SnackBar(content: Text('リクエストを承認しました！')),
         );
       }
     } catch (e) {
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('承認処理に失敗しました: $e')),
