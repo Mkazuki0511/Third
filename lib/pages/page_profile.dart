@@ -24,7 +24,7 @@ class Page_profile extends StatelessWidget {
           .snapshots(), // .snapshots() でリアルタイム更新
       builder: (context, snapshot) {
 
-        // --- 3. UIの状態をハンドリング ---
+        // 3. UIの状態をハンドリング
 
         // 読み込み中
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -41,10 +41,19 @@ class Page_profile extends StatelessWidget {
           return const Center(child: Text('ユーザーデータが見つかりません'));
         }
 
-        // --- 4. 成功！データを取得 ---
+        // 4. 成功！データを取得
         final userData = snapshot.data!.data()!;
 
-        // 5. データを使ってUIを構築
+        // 5. 平均満足度をここで計算
+        final double totalRating = (userData['totalRating'] ?? 0).toDouble();
+        final int ratingCount = userData['ratingCount'] ?? 0;
+
+        // 0除算を避けて、「平均満足度」を計算
+        final double averageRating = (ratingCount == 0)
+            ? 0.0 // まだ誰も評価していない
+            : totalRating / ratingCount;
+
+        // 6. データを使ってUIを構築
         return Scaffold(
           backgroundColor: Colors.grey[100],
           body: SafeArea(
@@ -56,10 +65,12 @@ class Page_profile extends StatelessWidget {
                     _buildHeader(context, userData),
                     const SizedBox(height: 16),
                     // データを渡す
-                    _buildRankCard(userData),
+                    _buildRankCard(userData, averageRating: averageRating),
                     const SizedBox(height: 16),
-                    _buildBadgesCard(userData),
+
+                    _buildBadgesCard(userData, averageRating: averageRating),
                     const SizedBox(height: 16),
+
                     _buildMenuList(userData),
                   ],
                 ),
@@ -161,7 +172,7 @@ class Page_profile extends StatelessWidget {
   }
 
   /// ランクカード
-  Widget _buildRankCard(Map<String, dynamic> userData) {
+  Widget _buildRankCard(Map<String, dynamic> userData, {required double averageRating}) {
     // Firestoreから rank と experiencePoints を取得
     final String rank = userData['rank'] ?? 'Beginner'; // 本物のランク
     final int exp = userData['experiencePoints'] ?? 0 ; // 本物の経験値
@@ -172,14 +183,6 @@ class Page_profile extends StatelessWidget {
 
     final int serviceCount = userData['servicesProvidedCount'] ?? 0;
     final int serviceUsedCount = userData['servicesUsedCount'] ?? 0;
-
-    final double totalRating = (userData['totalRating'] ?? 0).toDouble(); //　累計評価点の取得
-    final int ratingCount = userData['ratingCount'] ?? 0; //　評価回数 を取得
-
-    // 0除算を避けて、「平均満足度」を計算
-    final double averageRating = (ratingCount == 0)
-        ? 0.0 // まだ誰も評価していない
-        : totalRating / ratingCount;
 
     return Card(
       color: Colors.yellow[100],
@@ -221,8 +224,11 @@ class Page_profile extends StatelessWidget {
   }
 
   /// 実績バッジカード (まだダミー)
-  Widget _buildBadgesCard(Map<String, dynamic> userData) {
-    // TODO: 将来 userData からバッジ情報を取得する
+  Widget _buildBadgesCard(Map<String, dynamic> userData, {required double averageRating}) {
+
+    // バッジ獲得のロジック
+    final bool hasPopularBadge = (averageRating >= 4.0);
+
     return Card(
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -236,15 +242,54 @@ class Page_profile extends StatelessWidget {
             const SizedBox(height: 12),
             Wrap(
               spacing: 8.0,
-              runSpacing: 8.0,
+              runSpacing: 4.0,
               children: [
-                Chip(label: const Text('人気講師'), backgroundColor: Colors.white, side: BorderSide(color: Colors.grey.shade400)),
-                Chip(label: const Text('天才プログラミング講師'), backgroundColor: Colors.white, side: BorderSide(color: Colors.grey.shade400)),
+                // 「人気講師」バッジ
+                _buildBadgeItem(
+                  label: '人気講師',
+                  icon: Icons.star_rounded,
+                  color: Colors.amber,
+                  isUnlocked: hasPopularBadge, // 4.0以上で true になる
+                ),
+                // TODO: 他のバッジもここに追加
+                // 例：
+                // _buildBadgeItem(
+                //   label: 'ベテラン',
+                //   icon: Icons.military_tech,
+                //   color: Colors.blueGrey,
+                //   isUnlocked: (userData['servicesProvidedCount'] ?? 0) >= 10,
+                // ),
               ],
             )
           ],
         ),
       ),
+    );
+  }
+
+  /// バッジ1個分の表示ウィジェット（共通化）
+  /// (page_profile.dart のクラスの末尾などに追加)
+  Widget _buildBadgeItem({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required bool isUnlocked,
+  }) {
+    // 獲得していないバッジはグレーアウト
+    final displayColor = isUnlocked ? color : Colors.grey[350];
+    final displayTextColor = isUnlocked ? Colors.black87 : Colors.grey[500];
+    final labelText = isUnlocked ? label : '$label (未獲得)';
+
+    // Chip を使うとデザインが簡単です
+    return Chip(
+      avatar: Icon(icon, color: displayColor, size: 18),
+      label: Text(
+        labelText,
+        style: TextStyle(color: displayTextColor, fontSize: 13),
+      ),
+      backgroundColor: Colors.white,
+      side: BorderSide(color: displayColor ?? Colors.grey[350]!),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
     );
   }
 
