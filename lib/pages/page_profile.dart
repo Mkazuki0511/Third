@@ -295,7 +295,11 @@ class Page_profile extends StatelessWidget {
 
   /// メニューリスト (まだダミー)
   Widget _buildMenuList(Map<String, dynamic> userData) {
-    // TODO: 将来 userData から「足あと」の数などを取得する
+    // 現在のユーザーIDを取得するために FirebaseAuth を利用
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    // ログインしていない場合は何も表示しない（念のため）
+    if (currentUser == null) return const SizedBox.shrink();
+
     return Card(
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -304,26 +308,75 @@ class Page_profile extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          ListTile(
-            leading: const Icon(Icons.visibility, color: Colors.grey), // 足あと
+
+      // --- 1. 足あと (StreamBuilderで実装) ---
+      StreamBuilder<QuerySnapshot>(
+
+      // ★「自分」の 'footprints' サブコレクションを監視
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid) // ★自分のUID
+          .collection('footprints')
+          .snapshots(), // リアルタイムで件数を監視
+
+        builder: (context, snapshot) {
+
+          // データ取得中 or エラーの場合は簡易表示
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const ListTile(
+              leading: Icon(Icons.visibility, color: Colors.grey),
+              title: Text('足あと'),
+              trailing: Text('...', style: TextStyle(color: Colors.grey)),
+            );
+          }
+
+          // エラーもしくはデータが無い場合
+          if (!snapshot.hasData) {
+            return const ListTile(
+              leading: Icon(Icons.visibility, color: Colors.grey),
+              title: Text('足あと'),
+              trailing: Text('0', style: TextStyle(color: Colors.grey, fontSize: 16)),
+            );
+          }
+
+          // ★取得したドキュメントの「数」を件数として取得
+          final int footprintCount = snapshot.data!.docs.length;
+
+          return ListTile(
+            leading: const Icon(Icons.visibility, color: Colors.grey),
             title: const Text('足あと'),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.blue,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text('24', style: TextStyle(color: Colors.white, fontSize: 12)),
-                ),
+
+                // 件数が0より大きい場合のみ、青いバッジを表示
+                if (footprintCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      footprintCount.toString(), // ★本物の件数
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  )
+                // 0件の場合は '0' と表示
+                else
+                  const Text('0', style: TextStyle(color: Colors.grey, fontSize: 16)),
+
                 const SizedBox(width: 8),
                 const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
               ],
             ),
-            onTap: () {},
-          ),
+            onTap: () {
+              // TODO: 足あと一覧ページ (page_footprints.dartなど) へ遷移する
+            },
+          );
+        },
+      ),
+
           const Divider(height: 1, indent: 16),
           ListTile(
             leading: const Icon(Icons.favorite_border, color: Colors.grey),

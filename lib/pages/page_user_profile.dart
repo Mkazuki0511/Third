@@ -17,7 +17,6 @@ class Page_user_profile extends StatefulWidget {
   State<Page_user_profile> createState() => _Page_user_profileState();
 }
 
-// ↓↓↓↓ 【修正②】新しい _State クラスを作成 ↓↓↓↓
 class _Page_user_profileState extends State<Page_user_profile> {
 
   // Firebaseのインスタンス
@@ -94,6 +93,52 @@ class _Page_user_profileState extends State<Page_user_profile> {
     }
   }
   // ↑↑↑↑ 【ロジックここまで】 ↑↑↑↑
+
+  // 足あとロジック
+  void initState() {
+    super.initState();
+    // ページが読み込まれたら、足あとを付ける処理を呼ぶ
+    _addFootprint();
+  }
+
+  /// 足あとをFirestoreに書き込む
+  Future<void> _addFootprint() async {
+    try {
+      final User? currentUser = FirebaseAuth.instance.currentUser;
+
+      // 1. ログインしていない場合は何もしない
+      if (currentUser == null) {
+        return;
+      }
+
+      final String visitorId = currentUser.uid; // 見ている人（自分）
+      final String profileOwnerId = widget.userId; // 見られている人
+
+      // 2. 自分のプロフィールを自分で見ても足あとは付けない
+      if (visitorId == profileOwnerId) {
+        return;
+      }
+
+      // 3. 「見られた人」の footprints サブコレクションを取得
+      final CollectionReference footprintsRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(profileOwnerId) // ★「見られた人」のID
+          .collection('footprints');
+
+      // 4. 「見た人」のIDをドキュメントIDとして書き込む (set)
+      // ※ .add() ではなく .set() を使うのが重要です
+      // これにより、同じ人が何度訪問してもドキュメントは1つだけになり、
+      // 訪問日時は最新のものに更新されます。
+      await footprintsRef.doc(visitorId).set({
+        'visitorId': visitorId, // 念のためデータ内にもIDを保存
+        'timestamp': FieldValue.serverTimestamp(), // 最終訪問日時
+      });
+
+    } catch (e) {
+      // エラー処理 (開発中は print しておくと便利)
+      print('足あとの書き込みに失敗しました: $e');
+    }
+  }
 
 
   @override
