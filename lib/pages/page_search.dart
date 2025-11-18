@@ -16,6 +16,12 @@ class _Page_searchState extends State<Page_search> {
   final String? _currentUserUid = FirebaseAuth.instance.currentUser?.uid; // 現在ログインしているユーザーのID
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; // ← Firestore インスタンスを追加
 
+  // フィルター条件を保持する状態変数
+  String? _selectedRegion; // 地域
+  String? _selectedGender; // 性別
+  String? _selectedSkill;  // スキル
+  RangeValues? _selectedAgeRange; // 年齢
+
   /// --- birthday(Timestamp) から年齢を計算するロジック ---
   String _calculateAge(Timestamp? birthdayTimestamp) {
     if (birthdayTimestamp == null) {
@@ -66,6 +72,55 @@ class _Page_searchState extends State<Page_search> {
   }
   // ↑↑↑↑ 【ロジックここまで】 ↑↑↑↑
 
+
+  // --- フィルター条件に基づいて Firestore の Stream を構築する ---
+  Stream<QuerySnapshot<Map<String, dynamic>>> _buildUserStream() {
+    // 1. ベースとなるクエリ
+    Query<Map<String, dynamic>> query = _firestore.collection('users');
+
+    // 2. フィルター条件を動的に追加
+    // 【！】Firestore のルール上、範囲指定 (><) は1つのフィールドでしか使えません。
+
+    // 【地域】
+    if (_selectedRegion != null) {
+      // ★フィールド名が 'location' の場合
+      query = query.where('location', isEqualTo: _selectedRegion);
+    }
+
+    // 【性別】
+    if (_selectedGender != null) {
+      // ★フィールド名が 'gender' と仮定
+      query = query.where('gender', isEqualTo: _selectedGender);
+    }
+
+    // 【スキル】
+    if (_selectedSkill != null) {
+      // ★フィールド名が 'teachSkill' (単一文字列) と仮定
+      query = query.where('teachSkill', isEqualTo: _selectedSkill);
+    }
+
+    // 【年齢】（これが唯一の「範囲指定」クエリになります）
+    if (_selectedAgeRange != null) {
+      // 'age' 20〜30歳 は、'birthday' の Timestamp に変換する必要がある
+
+      final int minAge = _selectedAgeRange!.start.round(); // 最小
+      final int maxAge = _selectedAgeRange!.end.round();   // 最大
+
+      // (例) 30歳 の誕生日 (これより「後」に生まれている)
+      final DateTime minBirthday = DateTime.now().subtract(Duration(days: ((maxAge + 1) * 365.25).round()));
+      // (例) 20歳 の誕生日 (これより「前」に生まれている)
+      final DateTime maxBirthday = DateTime.now().subtract(Duration(days: (minAge * 365.25).round()));
+
+      // ★フィールド名が 'birthday' の場合
+      query = query
+          .where('birthday', isGreaterThanOrEqualTo: Timestamp.fromDate(minBirthday))
+          .where('birthday', isLessThanOrEqualTo: Timestamp.fromDate(maxBirthday));
+    }
+
+    // 3. 構築したクエリでスナップショットを返す
+    return query.snapshots();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,7 +128,7 @@ class _Page_searchState extends State<Page_search> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildSearchBar(), // 検索バーとフィルターボタン
+            _buildSearchBar(onFilterPressed: _showFilterSheet), // 検索バーとフィルターボタン
 
             // ユーザーカードのリスト（スクロール可能）
             Expanded(
@@ -98,11 +153,7 @@ class _Page_searchState extends State<Page_search> {
 
                     // 4. IDリストを使って、「ユーザー」のStreamBuilderを構築
                     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      // 'uid' が「操作済みIDリスト」に【含まれない】ユーザーだけを取得
-                      stream: _firestore
-                          .collection('users')
-                          .where('uid', whereNotIn: interactedUserIds.isEmpty ? ['dummyId'] : interactedUserIds) // 'whereNotIn' を使用
-                          .snapshots(),
+                      stream: _buildUserStream(),
 
                       builder: (context, userSnapshot) {
                         // 読み込み中
@@ -120,9 +171,23 @@ class _Page_searchState extends State<Page_search> {
                           return const Center(child: Text('表示できるユーザーがいません'));
                         }
 
-                        // 成功！
+                        // 5. 2段階フィルタリング（アプリ側除外）
                         final usersDocs = userSnapshot.data!.docs;
 
+                        final List<QueryDocumentSnapshot<Map<String, dynamic>>> filteredDocs =
+                        usersDocs.where((doc) {
+
+                          // 'uid' フィールドが「除外リスト」に含まれていなければ true (表示)
+                          return !interactedUserIds.contains(doc.data()['uid']);
+
+                        }).toList();
+
+                        if (filteredDocs.isEmpty) {
+                          return const Center(child: Text('表示できるユーザーがいません'));
+                        }
+
+
+                        // 6. 最終的なリストで GridView を構築
                         return GridView.builder(
                           padding: const EdgeInsets.all(16.0),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -131,9 +196,9 @@ class _Page_searchState extends State<Page_search> {
                             mainAxisSpacing: 12.0,
                             childAspectRatio: 1.0,
                           ),
-                          itemCount: usersDocs.length,
+                          itemCount: filteredDocs.length,
                           itemBuilder: (context, index) {
-                            final userData = usersDocs[index].data();
+                            final userData = filteredDocs[index].data();
                             return _buildUserGridCard(
                               context: context,
                               userData: userData,
@@ -152,7 +217,7 @@ class _Page_searchState extends State<Page_search> {
   }
 
   /// 検索バーとフィルターボタン
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar({required VoidCallback onFilterPressed}) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -175,12 +240,164 @@ class _Page_searchState extends State<Page_search> {
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.filter_list),
-            onPressed: () {
-              // TODO: フィルター設定
-            },
+            onPressed: onFilterPressed,
           ),
         ],
       ),
+    );
+  }
+
+  // ↓↓↓↓ フィルター選択UI（ボトムシート） ↓↓↓↓
+  /// --- フィルター選択ボトムシートを表示する ---
+  void _showFilterSheet() {
+    // シート内で一時的に保持する値
+    // (StatefulBuilder を使うため、シートが閉じるまで値が保持される)
+    String? tempRegion = _selectedRegion;
+    String? tempGender = _selectedGender;
+    String? tempSkill = _selectedSkill;
+    RangeValues tempAgeRange = _selectedAgeRange ?? const RangeValues(20, 50); // デフォルト20-50歳
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // 高さを画面の9割に
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        // StatefulBuilder を使うと、シート内だけで setState が可能
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setSheetState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.9,
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // --- ヘッダー ---
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                          'フィルター',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(sheetContext),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+
+                  // --- フィルター項目 ---
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        // --- 年齢 ---
+                        Text('年齢: ${tempAgeRange.start.round()} - ${tempAgeRange.end.round()} 歳'),
+                        RangeSlider(
+                          values: tempAgeRange,
+                          min: 18,
+                          max: 80,
+                          divisions: 62, // (80-18)
+                          labels: RangeLabels(
+                            tempAgeRange.start.round().toString(),
+                            tempAgeRange.end.round().toString(),
+                          ),
+                          onChanged: (values) {
+                            setSheetState(() {
+                              tempAgeRange = values;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 20),
+
+                        // --- 性別 ---
+                        // (仮のデータです。Firestoreに合わせてください)
+                        Text('性別'),
+                        DropdownButton<String>(
+                          value: tempGender,
+                          hint: const Text('指定なし'),
+                          isExpanded: true,
+                          items: ['男性', '女性', 'その他'] // 仮のリスト
+                              .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                              .toList(),
+                          onChanged: (value) {
+                            setSheetState(() {
+                              tempGender = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 20),
+
+                        // --- 地域 ---
+                        Text('地域'),
+                        DropdownButton<String>(
+                          value: tempRegion,
+                          hint: const Text('指定なし'),
+                          isExpanded: true,
+                          // TODO: 地域のリスト (例: 都道府県リスト) を用意する
+                          items: [
+                            '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+                            '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+                            '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
+                            '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
+                            '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
+                            '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
+                            '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'] // リスト
+                              .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                              .toList(),
+                          onChanged: (value) {
+                            setSheetState(() {
+                              tempRegion = value;
+                            });
+                          },
+                        ),
+                        // TODO: スキル のドロップダウンも同様に追加
+
+                      ],
+                    ),
+                  ),
+
+                  // --- 適用・リセットボタン ---
+                  Row(
+                    children: [
+                      TextButton(
+                        child: const Text('リセット'),
+                        onPressed: () {
+                          // メイン画面の状態（State）をリセット
+                          setState(() {
+                            _selectedRegion = null;
+                            _selectedGender = null;
+                            _selectedSkill = null;
+                            _selectedAgeRange = null;
+                          });
+                          Navigator.pop(sheetContext); // シートを閉じる
+                        },
+                      ),
+                      Expanded(
+                        child: ElevatedButton(
+                          child: const Text('適用する'),
+                          onPressed: () {
+                            // メイン画面の状態（State）を更新
+                            setState(() {
+                              _selectedRegion = tempRegion;
+                              _selectedGender = tempGender;
+                              _selectedSkill = tempSkill;
+                              _selectedAgeRange = tempAgeRange;
+                            });
+                            Navigator.pop(sheetContext); // シートを閉じる
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
