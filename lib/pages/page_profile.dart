@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Auth
 import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
+import 'package:third/sub/pages/page_favorites.dart';
 import 'package:third/sub/pages/page_profile.edit.dart'; // 「プロフィールを確認・編集」
 import 'package:third/sub/pages/page_footprints.dart'; // 「足あとページ」
+import 'package:third/sub/pages/page_favorites.dart'; // 「いいね履歴」
 
 class Page_profile extends StatelessWidget {
   const Page_profile({super.key});
@@ -72,7 +74,7 @@ class Page_profile extends StatelessWidget {
                     _buildBadgesCard(userData, averageRating: averageRating),
                     const SizedBox(height: 16),
 
-                    _buildMenuList(userData),
+                    _buildMenuList(context, userData),
                   ],
                 ),
               ),
@@ -295,7 +297,7 @@ class Page_profile extends StatelessWidget {
   }
 
   /// メニューリスト (まだダミー)
-  Widget _buildMenuList(Map<String, dynamic> userData) {
+  Widget _buildMenuList(BuildContext context, Map<String, dynamic> userData) {
     // 現在のユーザーIDを取得するために FirebaseAuth を利用
     final User? currentUser = FirebaseAuth.instance.currentUser;
     // ログインしていない場合は何も表示しない（念のため）
@@ -379,15 +381,22 @@ class Page_profile extends StatelessWidget {
           );
         },
       ),
-
           const Divider(height: 1, indent: 16),
+
+          // --- 2. お気に入り ---
           ListTile(
             leading: const Icon(Icons.favorite_border, color: Colors.grey),
             title: const Text('お気に入り'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            onTap: () {},
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(
+                   builder: (context) => const PageFavorites(),
+              ));
+            },
           ),
           const Divider(height: 1, indent: 16),
+
+          // --- 3. お知らせ ---
           ListTile(
             leading: const Icon(Icons.notifications_none, color: Colors.grey),
             title: const Text('お知らせ'),
