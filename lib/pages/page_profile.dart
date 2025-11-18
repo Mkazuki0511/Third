@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Auth
 import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
 import 'package:third/sub/pages/page_profile.edit.dart'; // 「プロフィールを確認・編集」
+import 'package:third/sub/pages/page_footprints.dart'; // 「足あとページ」
 
 class Page_profile extends StatelessWidget {
   const Page_profile({super.key});
@@ -371,7 +372,9 @@ class Page_profile extends StatelessWidget {
               ],
             ),
             onTap: () {
-              // TODO: 足あと一覧ページ (page_footprints.dartなど) へ遷移する
+              Navigator.push(context, MaterialPageRoute(
+                  builder: (context) => const PageFootprints(),
+              ));
             },
           );
         },
