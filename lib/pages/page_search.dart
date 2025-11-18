@@ -12,7 +12,6 @@ class Page_search extends StatefulWidget {
 }
 
 class _Page_searchState extends State<Page_search> {
-  // ↓↓↓↓ 【ここからロジック】 ↓↓↓↓
   final String? _currentUserUid = FirebaseAuth.instance.currentUser?.uid; // 現在ログインしているユーザーのID
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; // ← Firestore インスタンスを追加
 
@@ -70,7 +69,6 @@ class _Page_searchState extends State<Page_search> {
 
     return interactedUserIds.toList();
   }
-  // ↑↑↑↑ 【ロジックここまで】 ↑↑↑↑
 
 
   // --- フィルター条件に基づいて Firestore の Stream を構築する ---
@@ -79,27 +77,22 @@ class _Page_searchState extends State<Page_search> {
     Query<Map<String, dynamic>> query = _firestore.collection('users');
 
     // 2. フィルター条件を動的に追加
-    // 【！】Firestore のルール上、範囲指定 (><) は1つのフィールドでしか使えません。
-
     // 【地域】
     if (_selectedRegion != null) {
-      // ★フィールド名が 'location' の場合
       query = query.where('location', isEqualTo: _selectedRegion);
     }
 
     // 【性別】
     if (_selectedGender != null) {
-      // ★フィールド名が 'gender' と仮定
       query = query.where('gender', isEqualTo: _selectedGender);
     }
 
     // 【スキル】
     if (_selectedSkill != null) {
-      // ★フィールド名が 'teachSkill' (単一文字列) と仮定
       query = query.where('teachSkill', isEqualTo: _selectedSkill);
     }
 
-    // 【年齢】（これが唯一の「範囲指定」クエリになります）
+    // 【年齢】（「範囲指定」クエリ）
     if (_selectedAgeRange != null) {
       // 'age' 20〜30歳 は、'birthday' の Timestamp に変換する必要がある
 
@@ -111,7 +104,6 @@ class _Page_searchState extends State<Page_search> {
       // (例) 20歳 の誕生日 (これより「前」に生まれている)
       final DateTime maxBirthday = DateTime.now().subtract(Duration(days: (minAge * 365.25).round()));
 
-      // ★フィールド名が 'birthday' の場合
       query = query
           .where('birthday', isGreaterThanOrEqualTo: Timestamp.fromDate(minBirthday))
           .where('birthday', isLessThanOrEqualTo: Timestamp.fromDate(maxBirthday));
@@ -132,7 +124,6 @@ class _Page_searchState extends State<Page_search> {
 
             // ユーザーカードのリスト（スクロール可能）
             Expanded(
-              // ↓↓↓↓ 【ここから StreamBuilder に変更】 ↓↓↓↓
               child: FutureBuilder<List<String>>(
                   future: _getInteractedUserIds(), // ← 今作ったメソッドを呼ぶ
                   builder: (context, interactionSnapshot) {
@@ -247,7 +238,7 @@ class _Page_searchState extends State<Page_search> {
     );
   }
 
-  // ↓↓↓↓ フィルター選択UI（ボトムシート） ↓↓↓↓
+  // フィルター選択UI（ボトムシート）
   /// --- フィルター選択ボトムシートを表示する ---
   void _showFilterSheet() {
     // シート内で一時的に保持する値
@@ -299,7 +290,7 @@ class _Page_searchState extends State<Page_search> {
                           values: tempAgeRange,
                           min: 18,
                           max: 80,
-                          divisions: 62, // (80-18)
+                          divisions: 62,
                           labels: RangeLabels(
                             tempAgeRange.start.round().toString(),
                             tempAgeRange.end.round().toString(),
@@ -313,13 +304,12 @@ class _Page_searchState extends State<Page_search> {
                         const SizedBox(height: 20),
 
                         // --- 性別 ---
-                        // (仮のデータです。Firestoreに合わせてください)
                         Text('性別'),
                         DropdownButton<String>(
                           value: tempGender,
                           hint: const Text('指定なし'),
                           isExpanded: true,
-                          items: ['男性', '女性', 'その他'] // 仮のリスト
+                          items: ['男性', '女性', 'その他']
                               .map((g) => DropdownMenuItem(value: g, child: Text(g)))
                               .toList(),
                           onChanged: (value) {
@@ -336,7 +326,6 @@ class _Page_searchState extends State<Page_search> {
                           value: tempRegion,
                           hint: const Text('指定なし'),
                           isExpanded: true,
-                          // TODO: 地域のリスト (例: 都道府県リスト) を用意する
                           items: [
                             '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
                             '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
@@ -401,7 +390,6 @@ class _Page_searchState extends State<Page_search> {
     );
   }
 
-  // ↓↓↓↓ 【ここが「新しい」正しいメソッドです】 ↓↓↓↓
   /// 2列グリッド用ユーザーカード
   Widget _buildUserGridCard({
     required BuildContext context,
@@ -419,7 +407,7 @@ class _Page_searchState extends State<Page_search> {
 
     return GestureDetector( // ← カード全体をタップ可能にする
       onTap: () async {
-        // ↓↓↓↓ 【ここが「詳しく見る」のロジック】 ↓↓↓↓
+        // 「詳しく見る」のロジック
         // 遷移先の page_user_profile に、タップした人の 'uid' を渡す
         await Navigator.push(context, MaterialPageRoute(
           builder: (context) => Page_user_profile(userId: userData['uid']),
@@ -435,7 +423,7 @@ class _Page_searchState extends State<Page_search> {
           fit: StackFit.expand,
           children: [
             // 1. メイン画像
-            // ↓↓↓↓ 【profileImageUrl で分岐】 ↓↓↓↓
+            // profileImageUrl で分岐
             profileImageUrl != null
                 ? Image.network(
               profileImageUrl,
@@ -485,7 +473,6 @@ class _Page_searchState extends State<Page_search> {
             ),
 
             // 4. メインのテキスト情報
-            // ↓↓↓↓ 【本物のデータを表示】 ↓↓↓↓
             Positioned(
               bottom: 8,
               left: 8,
@@ -505,7 +492,7 @@ class _Page_searchState extends State<Page_search> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          teachSkill, // 教えるスキル（"ディズニー行きたい" の代わり）
+                          teachSkill, // 教えるスキル
                           style: const TextStyle(color: Colors.white, fontSize: 12),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -520,5 +507,4 @@ class _Page_searchState extends State<Page_search> {
       ),
     );
   }
-// ↑↑↑↑ 【このファイルに含まれる _buildUserGridCard は、この1つだけです】 ↑↑↑↑
 }
