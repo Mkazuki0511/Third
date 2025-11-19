@@ -18,8 +18,9 @@ class _Page_searchState extends State<Page_search> {
   // フィルター条件を保持する状態変数
   String? _selectedRegion; // 地域
   String? _selectedGender; // 性別
-  String? _selectedSkill;  // スキル
   RangeValues? _selectedAgeRange; // 年齢
+
+  String _searchKeyword = '';
 
   /// --- birthday(Timestamp) から年齢を計算するロジック ---
   String _calculateAge(Timestamp? birthdayTimestamp) {
@@ -85,11 +86,6 @@ class _Page_searchState extends State<Page_search> {
     // 【性別】
     if (_selectedGender != null) {
       query = query.where('gender', isEqualTo: _selectedGender);
-    }
-
-    // 【スキル】
-    if (_selectedSkill != null) {
-      query = query.where('teachSkill', isEqualTo: _selectedSkill);
     }
 
     // 【年齢】（「範囲指定」クエリ）
@@ -165,18 +161,31 @@ class _Page_searchState extends State<Page_search> {
                         // 5. 2段階フィルタリング（アプリ側除外）
                         final usersDocs = userSnapshot.data!.docs;
 
+                        // ここですべてのフィルタリングを行う　(検索フィルタリング)
                         final List<QueryDocumentSnapshot<Map<String, dynamic>>> filteredDocs =
                         usersDocs.where((doc) {
+                          final data = doc.data();
 
-                          // 'uid' フィールドが「除外リスト」に含まれていなければ true (表示)
-                          return !interactedUserIds.contains(doc.data()['uid']);
+                          // 1. 関わったユーザーを除外
+                          if (interactedUserIds.contains(data['uid'])) {
+                            return false;
+                          }
 
+                          // 2. スキル検索（部分一致）
+                          // キーワードが入力されている場合のみチェック
+                          if (_searchKeyword.isNotEmpty) {
+                            final String teachSkill = (data['teachSkill'] ?? '').toString();
+                            // 入力されたキーワードが含まれていなければ非表示 (false)
+                            if (!teachSkill.contains(_searchKeyword)) {
+                              return false;
+                            }
+                          }
+                          return true;
                         }).toList();
 
                         if (filteredDocs.isEmpty) {
-                          return const Center(child: Text('表示できるユーザーがいません'));
+                          return const Center(child: Text('条件に合うユーザーがいません'));
                         }
-
 
                         // 6. 最終的なリストで GridView を構築
                         return GridView.builder(
@@ -215,8 +224,13 @@ class _Page_searchState extends State<Page_search> {
         children: [
           Expanded(
             child: TextField(
+              onChanged: (value) {
+                setState(() {
+                  _searchKeyword = value;
+                });
+              },
               decoration: InputDecoration(
-                hintText: '検索条件を設定する',
+                hintText: 'スキルで検索',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white,
@@ -245,7 +259,6 @@ class _Page_searchState extends State<Page_search> {
     // (StatefulBuilder を使うため、シートが閉じるまで値が保持される)
     String? tempRegion = _selectedRegion;
     String? tempGender = _selectedGender;
-    String? tempSkill = _selectedSkill;
     RangeValues tempAgeRange = _selectedAgeRange ?? const RangeValues(20, 50); // デフォルト20-50歳
 
     showModalBottomSheet(
@@ -358,7 +371,6 @@ class _Page_searchState extends State<Page_search> {
                           setState(() {
                             _selectedRegion = null;
                             _selectedGender = null;
-                            _selectedSkill = null;
                             _selectedAgeRange = null;
                           });
                           Navigator.pop(sheetContext); // シートを閉じる
@@ -372,7 +384,6 @@ class _Page_searchState extends State<Page_search> {
                             setState(() {
                               _selectedRegion = tempRegion;
                               _selectedGender = tempGender;
-                              _selectedSkill = tempSkill;
                               _selectedAgeRange = tempAgeRange;
                             });
                             Navigator.pop(sheetContext); // シートを閉じる
@@ -402,8 +413,6 @@ class _Page_searchState extends State<Page_search> {
     final String location = userData['location'] ?? '未設定';
     final String? profileImageUrl = userData['profileImageUrl'];
     final String teachSkill = userData['teachSkill'] ?? 'スキル未設定';
-
-    // TODO: 'commonPoints' や 'photoCount' もロジックで計算する
 
     return GestureDetector( // ← カード全体をタップ可能にする
       onTap: () async {
@@ -452,25 +461,14 @@ class _Page_searchState extends State<Page_search> {
               ),
             ),
 
-            // 3. 共通点・写真数タグ (今はまだダミー)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Chip(
-                label: Text('共通点 5', style: const TextStyle(color: Colors.white, fontSize: 10)),
-                backgroundColor: Colors.orange.withOpacity(0.8),
-                padding: EdgeInsets.zero,
-              ),
-            ),
-            Positioned(
-              top: 8,
-              left: 8,
-              child: Chip(
-                label: Text('📷 6', style: const TextStyle(color: Colors.white, fontSize: 10)),
-                backgroundColor: Colors.black.withOpacity(0.5),
-                padding: EdgeInsets.zero,
-              ),
-            ),
+            // 3. 写真数タグ (削除)
+            //Positioned(
+              //top: 8,
+              //left: 8,
+              //child: Chip(
+              //label: Text('📷 6', style: const TextStyle(color: Colors.white, fontSize: 10)),
+              //backgroundColor: Colors.black.withOpacity(0.5),
+              //padding: EdgeInsets.zero,),),
 
             // 4. メインのテキスト情報
             Positioned(
