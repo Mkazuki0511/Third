@@ -133,7 +133,6 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildModalBadges(), // 「マッチングしにくい写真の例」
                 const SizedBox(height: 24),
                 ListTile(
                   leading: const Icon(Icons.photo_library),
@@ -164,23 +163,6 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
     );
   }
 
-  // (モーダル内の「悪い例」のUI - 変更なし)
-  Widget _buildModalBadges() {
-    return Column(
-      children: [
-        const Text('マッチングしにくい写真の例', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildBadge("暗い"),
-            _buildBadge("顔がアップすぎる"),
-            _buildBadge("顔が見えない"),
-          ],
-        ),
-      ],
-    );
-  }
 
   Widget _buildBadge(String text) {
     return Column(
@@ -307,24 +289,6 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
                 'あとで登録する',
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
-            ),
-
-            // --- 5. 「悪い例」のプレビュー (変更なし) ---
-            const SizedBox(height: 32),
-            const Divider(),
-            const SizedBox(height: 16),
-            const Text(
-              '異性が好まない写真の例',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildBadge("顔が隠れている"),
-                _buildBadge("加工アプリ"),
-                _buildBadge("本人が写っていない"),
-              ],
             ),
           ],
         ),
