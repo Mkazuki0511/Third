@@ -29,6 +29,14 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // テキストが入力されるたびに画面を再描画(setState)して、ボタンの有効/無効を即座に反映させる
+    _nicknameController.addListener(() => setState(() {}));
+    _emailController.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _nicknameController.dispose();
     _emailController.dispose();
@@ -144,7 +152,13 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
   @override
   Widget build(BuildContext context) {
     // ボタンが押せるかどうかを判定
-    final bool isButtonEnabled = _agreedToTerms;
+    final bool isButtonEnabled =
+        _nicknameController.text.isNotEmpty && // ニックネーム入力済み
+        _emailController.text.isNotEmpty &&    // メールアドレス入力済み
+        _selectedGender != null &&             // 性別選択済み
+        _selectedBirthday != null &&           // 誕生日選択済み
+        _selectedLocation != null &&           // 居住地選択済み
+        _agreedToTerms;                        // 規約に同意済み
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -194,7 +208,7 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
             _buildSelectorField(
               label: '生年月日',
               value: _selectedBirthday == null
-                  ? '2000年 01月 01日'
+                  ? '選択してください'
                   : '${_selectedBirthday!.year}年 ${_selectedBirthday!.month}月 ${_selectedBirthday!.day}日',
               onTap: () => _selectDate(context), // DatePickerを呼び出す
             ),
