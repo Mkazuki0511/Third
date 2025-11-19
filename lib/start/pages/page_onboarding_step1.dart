@@ -15,7 +15,6 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
   String? _selectedGender;
   DateTime? _selectedBirthday;
   String? _selectedLocation;
-  bool _is18OrOlder = false;
   bool _agreedToTerms = false;
 
   // 47都道府県のリスト
@@ -145,7 +144,7 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
   @override
   Widget build(BuildContext context) {
     // ボタンが押せるかどうかを判定
-    final bool isButtonEnabled = _is18OrOlder && _agreedToTerms;
+    final bool isButtonEnabled = _agreedToTerms;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -216,15 +215,6 @@ class _Page_onboarding_step1State extends State<Page_onboarding_step1> {
             const SizedBox(height: 24),
 
             // --- 3. 同意チェックボックス ---
-            _buildCheckbox(
-              title: '私は18歳以上で独身です。',
-              value: _is18OrOlder,
-              onChanged: (bool? newValue) {
-                setState(() {
-                  _is18OrOlder = newValue!;
-                });
-              },
-            ),
             _buildCheckbox(
               title: 'SKILL LINKの利用規約・プライバシーポリシー・コミュニティガイドラインの内容を確認のうえ、同意します。',
               value: _agreedToTerms,
