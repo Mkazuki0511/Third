@@ -151,11 +151,6 @@ class _Page_onboarding_step2State extends State<Page_onboarding_step2> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'あと少しです！',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
                 'ログイン用のパスワードを設定してください',
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
