@@ -45,7 +45,10 @@ class _Page_scheduleState extends State<Page_schedule> {
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text('予定'),
+        title: const Text(
+          '予定',
+          style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold, color: Colors.black),
+        ),
         centerTitle: true,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,

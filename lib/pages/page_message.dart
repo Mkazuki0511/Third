@@ -30,7 +30,7 @@ class _Page_messageState extends State<Page_message> {
       appBar: AppBar(
         title: const Text(
           'トーク',
-          style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold, color: Colors.black),
+          style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold, color: Colors.black),
         ),
         centerTitle: true, // 中央揃え
         backgroundColor: Colors.white,
