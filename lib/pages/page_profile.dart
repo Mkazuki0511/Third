@@ -134,7 +134,7 @@ class Page_profile extends StatelessWidget {
         // 「プロフィールを確認・編集」ボタン (ロジックはまだ)
         SizedBox(
           width: double.infinity,
-          child: OutlinedButton.icon(
+          child: ElevatedButton.icon(
             icon: const Icon(Icons.edit, size: 18),
             label: const Text('プロフィールを確認・編集'),
 
@@ -144,11 +144,11 @@ class Page_profile extends StatelessWidget {
                 builder: (context) => const Page_profile_edit(),
               ));
             },
-
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.black,
-              side: const BorderSide(color: Colors.grey),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.cyan,
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
             ),
           ),
         ),
