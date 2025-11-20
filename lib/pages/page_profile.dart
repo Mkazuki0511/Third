@@ -102,12 +102,6 @@ class Page_profile extends StatelessWidget {
 
     return Column(
       children: [
-        // ↓↓↓↓ 【修正】ニックネームを（仮で）ここに追加 ↓↓↓↓
-        Text(
-            nickname,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
-        ),
-        const SizedBox(height: 16),
         Row(
           children: [
             CircleAvatar(
