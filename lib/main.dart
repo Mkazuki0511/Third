@@ -71,6 +71,12 @@ class _MyHomePageState extends State<MyHomePage> {
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           // 2, 5つのアイテムに変更
+
+          iconSize: 24.0,
+
+          selectedLabelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.normal), // 選択中
+          unselectedLabelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.normal), // 非選択
+
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(icon: Icon(Icons.search),label: '探す'),
             BottomNavigationBarItem(icon: Icon(Icons.thumb_up),label: 'いいね'),
