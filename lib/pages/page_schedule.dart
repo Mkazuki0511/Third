@@ -295,7 +295,7 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
 
         return Card(
           margin: const EdgeInsets.only(bottom: 16.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
           elevation: 2.0,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
