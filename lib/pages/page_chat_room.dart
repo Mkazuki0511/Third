@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -31,6 +32,9 @@ class _Page_ChatRoomState extends State<Page_ChatRoom> {
   // 結合されたチャットルームID
   late String _chatRoomId;
 
+  // 画面を閉じたときに監視を終了するために必要です
+  StreamSubscription<QuerySnapshot>? _unreadSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -43,12 +47,33 @@ class _Page_ChatRoomState extends State<Page_ChatRoom> {
     ids.sort();
     // 2つのIDを '_' で結合して、一意のチャットルームIDを作成
     _chatRoomId = ids.join('_');
+
+    // ↓↓↓↓ 【追加】画面を開いている間、未読メッセージを既読にする処理を開始 ↓↓↓↓
+    _startMarkingAsRead();
   }
 
   @override
   void dispose() {
+    _unreadSubscription?.cancel();
     _messageController.dispose();
     super.dispose();
+  }
+
+  // ↓↓↓↓ 【追加】未読メッセージを監視して既読にするロジック ↓↓↓↓
+  void _startMarkingAsRead() {
+    final unreadQuery = _firestore
+        .collection('chat_rooms')
+        .doc(_chatRoomId)
+        .collection('messages')
+        .where('receiverId', isEqualTo: _myId) // 自分宛て
+        .where('isRead', isEqualTo: false);    // 未読のもの
+
+    _unreadSubscription = unreadQuery.snapshots().listen((snapshot) {
+      for (var doc in snapshot.docs) {
+        // 1つずつ既読(true)に更新
+        doc.reference.update({'isRead': true});
+      }
+    });
   }
 
   /// --- メッセージを送信するロジック ---
@@ -72,6 +97,7 @@ class _Page_ChatRoomState extends State<Page_ChatRoom> {
         'senderId': _myId, // 送信者 (自分)
         'receiverId': widget.opponentId, // 受信者 (相手)
         'createdAt': FieldValue.serverTimestamp(), // 送信日時
+        'isRead': false, // ← 【修正】送信時は「未読」にする
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

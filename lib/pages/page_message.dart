@@ -137,6 +137,7 @@ class _MatchListItemState extends State<_MatchListItem> {
   @override
   Widget build(BuildContext context) {
     // 7. `FutureBuilder` で相手のユーザーデータの読み込みを待つ
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       future: _userDataFuture,
       builder: (context, userSnapshot) {
@@ -207,6 +208,53 @@ class _MatchListItemState extends State<_MatchListItem> {
                     );
                   },
                 ),
+
+                // ↓↓↓↓ 【追加】右側に未読バッジを表示 ↓↓↓↓
+                trailing: StreamBuilder<QuerySnapshot>(
+                  stream: _firestore
+                      .collection('chat_rooms')
+                      .doc(_chatRoomId)
+                      .collection('messages')
+                      .where('receiverId', isEqualTo: currentUserId) // 自分宛て
+                      .where('isRead', isEqualTo: false) // 未読のみ
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      // 未読なしなら何も表示しない、または矢印だけ表示
+                      return const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey);
+                    }
+
+                    // 未読数
+                    final int unreadCount = snapshot.data!.docs.length;
+
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.cyan, // バッジの色
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 20,
+                            minHeight: 20,
+                          ),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                // ↑↑↑↑ 【ここまで】 ↑↑↑↑
 
                 onTap: () {
                   // ここに個別のチャットルーム(page_chat_room.dart)への遷移
