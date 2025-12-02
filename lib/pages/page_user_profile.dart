@@ -284,38 +284,89 @@ class _Page_user_profileState extends State<Page_user_profile> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 1. 名前とPartnerバッジ
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               '$nickname $age歳 $location',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-            const Chip(
-              label: Text('Partner'), // (ダミー)
-              backgroundColor: Colors.blueAccent,
-              labelStyle: TextStyle(color: Colors.white, fontSize: 12),
-              visualDensity: VisualDensity.compact,
+            // Partnerバッジ
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.cyan, // 画像に合わせた色
+                borderRadius: BorderRadius.circular(4), // 角を少し丸く
+              ),
+              child: const Text(
+                'Partner',
+                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Row(
+
+        // 2. オンラインステータス
+        const SizedBox(height: 8),
+        const Row(
           children: [
-            Chip(
-              label: Text('教えるよ: $teachSkill'),
-              backgroundColor: Colors.cyan[100],
-              labelStyle: const TextStyle(color: Colors.cyan, fontSize: 12),
-              visualDensity: VisualDensity.compact,
-            ),
-            const SizedBox(width: 8),
-            Chip(
-              label: Text('学びたい: $learnSkill'),
-              backgroundColor: Colors.cyan[100],
-              labelStyle: const TextStyle(color: Colors.cyan, fontSize: 12),
-              visualDensity: VisualDensity.compact,
+            Icon(Icons.circle, size: 10, color: Colors.green), // 緑の丸
+            SizedBox(width: 6),
+            Text(
+              'オンライン',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
+        ),
+
+        const SizedBox(height: 20),
+
+        // 3. スキル表示エリア (ここが今回のメイン修正)
+        Row(
+          children: [
+            // 教えるよ
+            _buildSkillItem(label: '教えるよ: ', skill: teachSkill),
+
+            const SizedBox(width: 24), // 教えると学びたいの間隔
+
+            // 学びたい
+            _buildSkillItem(label: '学びたい: ', skill: learnSkill),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// スキル項目を表示するヘルパーメソッド (黒文字ラベル + シアンバッジ)
+  Widget _buildSkillItem({required String label, required String skill}) {
+    return Row(
+      children: [
+        // ラベル (黒字・囲みなし)
+        Text(
+          label,
+          style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.black
+          ),
+        ),
+        const SizedBox(width: 8),
+        // スキル名 (白文字・シアン背景・カプセル型)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.cyan,
+            borderRadius: BorderRadius.circular(20), // 丸みを強くしてカプセル型に
+          ),
+          child: Text(
+            skill,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold
+            ),
+          ),
         ),
       ],
     );
