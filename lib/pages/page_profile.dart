@@ -147,7 +147,7 @@ class Page_profile extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.cyan,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: const StadiumBorder(), // RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
           ),
@@ -168,55 +168,180 @@ class Page_profile extends StatelessWidget {
     );
   }
 
+  /// ランク情報を定義するヘルパークラス
+  Map<String, dynamic> _getRankInfo(int exp) {
+    // 画像に基づいたランク定義
+    if (exp >= 3500) {
+      return {
+        'name': 'Legend',
+        'color': const Color(0xFF81D4FA), // 水色
+        'ribbon': const Color(0xFFFF4081), // ピンク
+        'minExp': 3500,
+        'nextExp': null, // 最上位
+      };
+    } else if (exp >= 1800) {
+      return {
+        'name': 'Mentor',
+        'color': const Color(0xFFFFC107), // ゴールド/黄色
+        'ribbon': const Color(0xFFFF5722), // 赤/オレンジ
+        'minExp': 1800,
+        'nextExp': 3500,
+      };
+    } else if (exp >= 900) {
+      return {
+        'name': 'Partner',
+        'color': const Color(0xFFCFD8DC), // シルバー/グレー
+        'ribbon': Colors.cyan,             // シアン (アプリテーマ色)
+        'minExp': 900,
+        'nextExp': 1800,
+      };
+    } else if (exp >= 300) {
+      return {
+        'name': 'Learner',
+        'color': const Color(0xFFD87608), // ブロンズ/茶色
+        'ribbon': const Color(0xFF5C6BC0), // インディゴ/紫
+        'minExp': 300,
+        'nextExp': 900,
+      };
+    } else {
+      return {
+        'name': 'Beginner',
+        'color': const Color(0xFFE53935), // 赤
+        'ribbon': const Color(0xFFFFB300), // 黄色
+        'minExp': 0,
+        'nextExp': 300,
+      };
+    }
+  }
+
   /// ランクカード
   Widget _buildRankCard(Map<String, dynamic> userData, {required double averageRating}) {
-    // Firestoreから rank と experiencePoints を取得
-    final String rank = userData['rank'] ?? 'Beginner'; // 本物のランク
-    final int exp = userData['experiencePoints'] ?? 0 ; // 本物の経験値
-
-    // (ランクアップに必要な経験値のロジック（仮）)
-    final int nextRankExp = 1000; // (例: 次は1000必要)
-    final double progress = (exp / nextRankExp).clamp(0.0, 1.0);
-
+    // Firestoreから経験値を取得 (なければ0)
+    final int exp = userData['experiencePoints'] ?? 0;
     final int serviceCount = userData['servicesProvidedCount'] ?? 0;
     final int serviceUsedCount = userData['servicesUsedCount'] ?? 0;
 
+    // 現在のランク情報を取得
+    final rankInfo = _getRankInfo(exp);
+    final String rankName = rankInfo['name'];
+    final Color cardColor = rankInfo['color'];
+    final Color ribbonColor = rankInfo['ribbon'];
+    final int minExp = rankInfo['minExp'];
+    final int? nextExp = rankInfo['nextExp'];
+
+    // プログレスバーの計算 (0.0 〜 1.0)
+    double progress = 0.0;
+    String nextLevelText = 'MAX RANK';
+
+    if (nextExp != null) {
+      final int range = nextExp - minExp; // 次のランクまでの必要経験値量
+      final int currentInLevel = exp - minExp; // 現在のランク内での獲得量
+      progress = (currentInLevel / range).clamp(0.0, 1.0);
+      nextLevelText = 'あと ${nextExp - exp} EXPでランクアップ';
+    } else {
+      progress = 1.0; // 最高ランク
+    }
+
     return Card(
-      color: Colors.yellow[100],
+      color: cardColor, // ランクによって色を変える
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Text(rank, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+      elevation: 2,
+      child: Stack(
+        clipBehavior: Clip.none, // リボンを少しはみ出させる場合などに有効
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildStatColumn(serviceCount.toString(), '提供回数'),
-                // 4.5 -> 割り算した結果 (小数点1桁で表示)
-                _buildStatColumn(averageRating.toStringAsFixed(1), '平均満足度'),
-                _buildStatColumn(serviceUsedCount.toString(), '利用回数'),
+                // ランク名 (リボンのような装飾)
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: ribbonColor,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: const [
+                        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
+                      ],
+                    ),
+                    child: Text(
+                      rankName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 統計データ (白文字にして視認性を確保)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildRankStat('提供回数', '$serviceCount回'),
+                    _buildRankStat('平均満足度', averageRating.toStringAsFixed(1)),
+                    _buildRankStat('利用回数', '$serviceUsedCount回'),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // プログレスバー
+                Column(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        backgroundColor: Colors.white.withOpacity(0.5),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                        minHeight: 8,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      nextLevelText,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            // プログレスバー
-            LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.grey[300],
-              color: Colors.orange,
-              minHeight: 10,
-              borderRadius: BorderRadius.circular(5),
-            ),
-            const SizedBox(height: 8),
-            Center(child: Text('あと ${nextRankExp - exp} exでプラチナランク', style: const TextStyle(fontSize: 12))),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+
+  // ランクカード内の統計用ウィジェット (文字色を白に固定)
+  Widget _buildRankStat(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+              fontSize: 11,
+              color: Colors.white70
+          ),
+        ),
+      ],
     );
   }
 
