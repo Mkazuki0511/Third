@@ -130,60 +130,111 @@ class _Page_scheduleState extends State<Page_schedule> {
     );
   }
 
-  /// 「提供」「利用」のトグルボタン
+  /// 「提供」「利用」のトグルボタン (添付画像風のデザイン)
   Widget _buildToggleButtons() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
+    // アニメーションの時間を定義
+    const animationDuration = Duration(milliseconds: 300);
+    // アニメーションの動き方を定義（滑らかに加速・減速）
+    const animationCurve = Curves.easeInOut;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24.0),
+      height: 50,
+      // グレーの背景レール
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(30.0),
+      ),
+      child: Stack(
         children: [
-          // ↓↓↓↓ 【修正④】「利用」ボタンを左（1番目）に配置 ↓↓↓↓
-          _buildToggleButton(
-            text: '利用',
-            isSelected: !_isProvidingSelected, // 'false' の時に選択状態
-            onPressed: () {
-              setState(() {
-                _isProvidingSelected = false; // 'false' をセット
-              });
-            },
+          // 1. 動く白い背景 (スライダー)
+          AnimatedAlign(
+            duration: animationDuration,
+            curve: animationCurve,
+            // 状態に応じて配置場所を左端か右端に変える
+            alignment: !_isProvidingSelected ? Alignment.centerLeft : Alignment.centerRight,
+            child: FractionallySizedBox(
+              widthFactor: 0.5, // 幅は全体の半分
+              heightFactor: 1.0, // 高さは全体と同じ
+              child: Container(
+                margin: const EdgeInsets.all(4.0), // レールとの隙間
+                decoration: BoxDecoration(
+                  color: Colors.cyan,
+                  borderRadius: BorderRadius.circular(25.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          const SizedBox(width: 12),
-          // ↓↓↓↓ 【修正⑤】「提供」ボタンを右（2番目）に配置 ↓↓↓↓
-          _buildToggleButton(
-            text: '提供',
-            isSelected: _isProvidingSelected, // 'true' の時に選択状態
-            onPressed: () {
-              setState(() {
-                _isProvidingSelected = true; // 'true' をセット
-              });
-            },
+
+          // 2. 前面のテキストとタップ領域
+          Row(
+            children: [
+              // 左側：「利用」ボタン領域
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isProvidingSelected = false;
+                    });
+                  },
+                  child: Container(
+                    // タップ領域を確保するための透明なコンテナ
+                    color: Colors.transparent,
+                    alignment: Alignment.center,
+                    // テキストの色も滑らかに変える
+                    child: AnimatedDefaultTextStyle(
+                      duration: animationDuration,
+                      curve: animationCurve,
+                      style: TextStyle(
+                        // 選択されている(false)なら黒、そうでなければグレー
+                        color: !_isProvidingSelected ? Colors.white : Colors.grey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      child: const Text('利用'),
+                    ),
+                  ),
+                ),
+              ),
+              // 右側：「提供」ボタン領域
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isProvidingSelected = true;
+                    });
+                  },
+                  child: Container(
+                    color: Colors.transparent,
+                    alignment: Alignment.center,
+                    child: AnimatedDefaultTextStyle(
+                      duration: animationDuration,
+                      curve: animationCurve,
+                      style: TextStyle(
+                        // 選択されている(true)なら黒、そうでなければグレー
+                        color: _isProvidingSelected ? Colors.white : Colors.grey,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      child: const Text('提供'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
-
-  /// トグルボタンの共通ウィジェット (変更なし)
-  Widget _buildToggleButton({
-    required String text,
-    required bool isSelected,
-    required VoidCallback onPressed,
-  }) {
-    return Expanded(
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          backgroundColor: isSelected ? Colors.cyan : Colors.white,
-          foregroundColor: isSelected ? Colors.white : Colors.cyan,
-          side: BorderSide(color: isSelected ? Colors.cyan : Colors.grey.shade300),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
-        ),
-        child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
 }
-
 
 // --- ↓↓↓↓ 【ここからが新設ウィジェット】 ↓↓↓↓ ---
 /// --- 予定カード本体（`opponentId` からユーザー情報を取得する） ---
