@@ -26,6 +26,22 @@ class _Page_user_profileState extends State<Page_user_profile> {
   // 「いいね！」ボタンのローディング状態
   bool _isLoading = false;
 
+  // ↓↓↓↓ 【追加】経験値から画像パスを判定するメソッド ↓↓↓↓
+  String _getRankImagePath(int exp) {
+    if (exp >= 3500) {
+      return 'assets/images/Lank_Legend.png';
+    } else if (exp >= 1800) {
+      return 'assets/images/Lank_Mentor.png';
+    } else if (exp >= 900) {
+      return 'assets/images/Lank_Partner.png';
+    } else if (exp >= 300) {
+      // ※ファイル名の綴りに注意 ("Learner")
+      return 'assets/images/Lank_Learner.png';
+    } else {
+      return 'assets/images/Lank_Beginner.png';
+    }
+  }
+
   /// --- birthday(Timestamp) から年齢を計算するロジック ---
   String _calculateAge(Timestamp? birthdayTimestamp) {
     if (birthdayTimestamp == null) return '?';
@@ -51,9 +67,6 @@ class _Page_user_profileState extends State<Page_user_profile> {
       );
       return;
     }
-
-    // 2. 既にリクエスト済みか、マッチ済みか、などを（将来的には）チェックする
-    // TODO: (今はシンプルに、押したらリクエストを送る)
 
     setState(() {
       _isLoading = true; // ローディング開始
@@ -180,6 +193,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
           final String selfIntroduction = userData['selfIntroduction'] ?? '自己紹介がありません';
           final String teachSkill = userData['teachSkill'] ?? '未設定';
           final String learnSkill = userData['learnSkill'] ?? '未設定';
+          final int experiencePoints = userData['experiencePoints'] ?? 0;
 
           // UIを構築 (変更なし)
           return SingleChildScrollView(
@@ -195,7 +209,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 16),
-                      _buildNameAndLocation(nickname, age, location, teachSkill, learnSkill),
+                      _buildNameAndLocation(nickname, age, location, teachSkill, learnSkill, experiencePoints),
                       const SizedBox(height: 16),
                       _buildSelfIntroductionCard(selfIntroduction),
                       const SizedBox(height: 16),
@@ -280,29 +294,28 @@ class _Page_user_profileState extends State<Page_user_profile> {
   }
 
   /// 名前のエリア
-  Widget _buildNameAndLocation(String nickname, String age, String location, String teachSkill, String learnSkill) {
+  Widget _buildNameAndLocation(String nickname, String age, String location, String teachSkill, String learnSkill, int exp) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. 名前とPartnerバッジ
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center, // 縦位置を中央揃え
           children: [
-            Text(
+            Expanded(
+              child:Text(
               '$nickname $age歳 $location',
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+             ),
             ),
-            // Partnerバッジ
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.cyan, // 画像に合わせた色
-                borderRadius: BorderRadius.circular(4), // 角を少し丸く
-              ),
-              child: const Text(
-                'Partner',
-                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
+            const SizedBox(width: 8), // 名前とバッジの間隔
+
+            // ランク画像を表示
+            Image.asset(
+              _getRankImagePath(exp), // 経験値に応じた画像パスを取得
+              height: 30, // 高さを調整 (お好みで変更してください)
+              fit: BoxFit.contain,
             ),
           ],
         ),
