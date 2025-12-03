@@ -223,21 +223,37 @@ class _Page_searchState extends State<Page_search> {
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              onChanged: (value) {
-                setState(() {
-                  _searchKeyword = value;
-                });
-              },
-              decoration: InputDecoration(
-                hintText: 'スキルで検索',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10.0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30.0),
-                  borderSide: BorderSide.none,
+            child: SizedBox(
+              height: 36,
+              child: TextField(
+                onChanged: (value) {
+                  setState(() {
+                    _searchKeyword = value;
+                  });
+                },
+                style: const TextStyle(
+                  fontSize: 13.0, // 例: 14.0 -> 13.0
+                  color: Colors.black,
+                ),
+                textAlignVertical: TextAlignVertical.center,
+                decoration: InputDecoration(
+                  hintText: 'スキルで検索',
+                  hintStyle: const TextStyle(
+                    fontSize: 13.0, // 入力文字と同じサイズに合わせる
+                    color: Colors.grey,
+                  ),
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  filled: true,
+                  fillColor: Colors.white,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                      vertical: 0.0,
+                      horizontal: 16.0,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
             ),
