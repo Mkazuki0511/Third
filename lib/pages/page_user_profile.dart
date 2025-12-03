@@ -175,7 +175,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
               children: [
                 Padding(
                   // AppBarの下からスタートさせるため top は少なめでOK
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -196,7 +196,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
 
                         // 2. 詳細情報
                         Padding(
-                          padding: const EdgeInsets.all(20.0),
+                          padding: const EdgeInsets.fromLTRB(30, 10, 30, 30),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -283,7 +283,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
   /// カード内の正方形写真
   Widget _buildSquarePhoto(String? profileImageUrl) {
     return Padding(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.fromLTRB(30, 30, 30, 0),
       child: AspectRatio(
         aspectRatio: 1.0,
         child: ClipRRect(
@@ -320,14 +320,14 @@ class _Page_user_profileState extends State<Page_user_profile> {
               child: Text(
                 '$nickname $age歳 $location',
                 style:
-                const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: 8),
             Image.asset(
               _getRankImagePath(exp),
-              height: 30,
+              height: 24,
               fit: BoxFit.contain,
             ),
           ],
@@ -378,7 +378,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
               style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
-                  fontWeight: FontWeight.bold),
+                  fontWeight: FontWeight.w500),
             ),
           ),
         ),
