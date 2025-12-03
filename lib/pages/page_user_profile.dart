@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ↓↓↓↓ 【修正①】StatelessWidget -> StatefulWidget に変更 ↓↓↓↓
 class Page_user_profile extends StatefulWidget {
-
   // どのユーザーのプロフィールを表示するか、IDを受け取る
   final String userId;
 
@@ -18,7 +16,6 @@ class Page_user_profile extends StatefulWidget {
 }
 
 class _Page_user_profileState extends State<Page_user_profile> {
-
   // Firebaseのインスタンス
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -26,7 +23,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
   // 「いいね！」ボタンのローディング状態
   bool _isLoading = false;
 
-  // ↓↓↓↓ 【追加】経験値から画像パスを判定するメソッド ↓↓↓↓
+  // ランク画像判定
   String _getRankImagePath(int exp) {
     if (exp >= 3500) {
       return 'assets/images/Lank_Legend.png';
@@ -35,69 +32,63 @@ class _Page_user_profileState extends State<Page_user_profile> {
     } else if (exp >= 900) {
       return 'assets/images/Lank_Partner.png';
     } else if (exp >= 300) {
-      // ※ファイル名の綴りに注意 ("Learner")
       return 'assets/images/Lank_Learner.png';
     } else {
       return 'assets/images/Lank_Beginner.png';
     }
   }
 
-  /// --- birthday(Timestamp) から年齢を計算するロジック ---
+  // 年齢計算
   String _calculateAge(Timestamp? birthdayTimestamp) {
     if (birthdayTimestamp == null) return '?';
     final DateTime birthday = birthdayTimestamp.toDate();
     final DateTime today = DateTime.now();
     int age = today.year - birthday.year;
-    if (today.month < birthday.month || (today.month == birthday.month && today.day < birthday.day)) {
+    if (today.month < birthday.month ||
+        (today.month == birthday.month && today.day < birthday.day)) {
       age--;
     }
     return age.toString();
   }
 
-  // ↓↓↓↓ 【ここからが今回のロジック】 ↓↓↓↓
-  /// --- 「いいね！」(リクエスト) を送信するロジック ---
+  // 「いいね！」送信ロジック
   Future<void> _sendRequest() async {
-    // 1. 自分のID (currentUser) と 相手のID (targetUser) を取得
     final String? myId = _auth.currentUser?.uid;
-    final String targetUserId = widget.userId; // ← StatefulWidgetなので 'widget.' が必要
+    final String targetUserId = widget.userId;
 
     if (myId == null) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('エラー: ログインしていません')),
-      );
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('エラー: ログインしていません')),
+        );
       return;
     }
 
     setState(() {
-      _isLoading = true; // ローディング開始
+      _isLoading = true;
     });
 
     try {
-      // 3. Firestore の 'requests' コレクションに新しいドキュメントを追加
       await _firestore.collection('requests').add({
-        'fromId': myId,         // 送信者 (自分)
-        'toId': targetUserId, // 受信者 (相手)
-        'status': 'pending',  // 状態: '承認待ち'
-        'createdAt': FieldValue.serverTimestamp(), // 送信日時
+        'fromId': myId,
+        'toId': targetUserId,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // 4. 成功メッセージを表示
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('「いいね！」を送信しました！')),
         );
-        Navigator.of(context).pop(); // (例: 探す画面に戻る)
+        Navigator.of(context).pop();
       }
-
     } catch (e) {
-      // エラー処理
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('リクエストの送信に失敗しました: $e')),
         );
       }
     } finally {
-      // 処理が完了したらローディングを解除
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -105,77 +96,59 @@ class _Page_user_profileState extends State<Page_user_profile> {
       }
     }
   }
-  // ↑↑↑↑ 【ロジックここまで】 ↑↑↑↑
 
   // 足あとロジック
+  @override
   void initState() {
     super.initState();
-    // ページが読み込まれたら、足あとを付ける処理を呼ぶ
     _addFootprint();
   }
 
-  /// 足あとをFirestoreに書き込む
   Future<void> _addFootprint() async {
     try {
       final User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
 
-      // 1. ログインしていない場合は何もしない
-      if (currentUser == null) {
-        return;
-      }
+      final String visitorId = currentUser.uid;
+      final String profileOwnerId = widget.userId;
 
-      final String visitorId = currentUser.uid; // 見ている人（自分）
-      final String profileOwnerId = widget.userId; // 見られている人
+      if (visitorId == profileOwnerId) return;
 
-      // 2. 自分のプロフィールを自分で見ても足あとは付けない
-      if (visitorId == profileOwnerId) {
-        return;
-      }
-
-      // 3. 「見られた人」の footprints サブコレクションを取得
       final CollectionReference footprintsRef = FirebaseFirestore.instance
           .collection('users')
-          .doc(profileOwnerId) // ★「見られた人」のID
+          .doc(profileOwnerId)
           .collection('footprints');
 
-      // 4. 「見た人」のIDをドキュメントIDとして書き込む (set)
-      // ※ .add() ではなく .set() を使うのが重要です
-      // これにより、同じ人が何度訪問してもドキュメントは1つだけになり、
-      // 訪問日時は最新のものに更新されます。
       await footprintsRef.doc(visitorId).set({
-        'visitorId': visitorId, // 念のためデータ内にもIDを保存
-        'timestamp': FieldValue.serverTimestamp(), // 最終訪問日時
+        'visitorId': visitorId,
+        'timestamp': FieldValue.serverTimestamp(),
       });
-
     } catch (e) {
-      // エラー処理 (開発中は print しておくと便利)
       print('足あとの書き込みに失敗しました: $e');
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-
-      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFFF5F5F5), // ベース背景色
+      // extendBodyBehindAppBar: true, // ← 削除（カードがヘッダーに被らないようにするため）
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFFF5F5F5), // 背景色と合わせる
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
 
-      // 「いいね！」ボタンを画面下部に固定
+      // 「いいね！」ボタン
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      // ↓↓↓↓ 【修正③】_isLoading を渡す ↓↓↓↓
       floatingActionButton: _buildFloatingLikeButton(context, _isLoading),
 
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        // ↓↓↓↓ 【修正④】widget.userId を使う ↓↓↓↓
         stream: _firestore.collection('users').doc(widget.userId).snapshots(),
-
         builder: (context, snapshot) {
-
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -183,41 +156,78 @@ class _Page_user_profileState extends State<Page_user_profile> {
             return const Center(child: Text('ユーザーデータが見つかりません'));
           }
 
-          // データを取得
           final userData = snapshot.data!.data()!;
           final String nickname = userData['nickname'] ?? '名前なし';
           final String? profileImageUrl = userData['profileImageUrl'];
           final String location = userData['location'] ?? '未設定';
           final Timestamp? birthdayTimestamp = userData['birthday'];
           final String age = _calculateAge(birthdayTimestamp);
-          final String selfIntroduction = userData['selfIntroduction'] ?? '自己紹介がありません';
+          final String selfIntroduction =
+              userData['selfIntroduction'] ?? '自己紹介がありません';
           final String teachSkill = userData['teachSkill'] ?? '未設定';
-          final String learnSkill = userData['learnSkill'] ?? '未設定';
+          // final String learnSkill = userData['learnSkill'] ?? '未設定'; // 今回は使わない
           final int experiencePoints = userData['experiencePoints'] ?? 0;
 
-          // UIを構築 (変更なし)
           return SingleChildScrollView(
+            // 下部にボタン用の余白を確保
             padding: EdgeInsets.zero,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildMainPhotoCard(profileImageUrl),
-
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 16),
-                      _buildNameAndLocation(nickname, age, location, teachSkill, learnSkill, experiencePoints),
-                      const SizedBox(height: 16),
-                      _buildSelfIntroductionCard(selfIntroduction),
-                      const SizedBox(height: 16),
-                      _buildBasicInfoCard(), // (まだダミー)
-                      const SizedBox(height: 16),
-                      _buildInterestsCard(), // (まだダミー)
-                      const SizedBox(height: 120), // ボタンの余白
-                    ],
+                  // AppBarの下からスタートさせるため top は少なめでOK
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20.0),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 1. 写真（カード内）
+                        _buildSquarePhoto(profileImageUrl),
+
+                        // 2. 詳細情報
+                        Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildNameAndLocation(
+                                nickname,
+                                age,
+                                location,
+                                teachSkill,
+                                experiencePoints,
+                              ),
+                              const SizedBox(height: 24),
+                              const Divider(height: 1),
+                              const SizedBox(height: 24),
+                              const Text(
+                                '自己紹介',
+                                style: TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                selfIntroduction,
+                                style: const TextStyle(
+                                    fontSize: 15,
+                                    height: 1.6,
+                                    color: Colors.black87),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -228,8 +238,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
     );
   }
 
-  /// 2層目：画面下部に固定される「いいね！」ボタン
-  // ↓↓↓↓ 【修正⑤】isLoading を受け取る ↓↓↓↓
+  /// 「いいね！」ボタン
   Widget _buildFloatingLikeButton(BuildContext context, bool isLoading) {
     return Align(
       alignment: Alignment.bottomCenter,
@@ -240,7 +249,6 @@ class _Page_user_profileState extends State<Page_user_profile> {
           child: SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              // ↓↓↓↓ 【修正⑥】ローディング中は押せないように(null)する ↓↓↓↓
               onPressed: isLoading ? null : _sendRequest,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.cyan,
@@ -249,19 +257,21 @@ class _Page_user_profileState extends State<Page_user_profile> {
                   borderRadius: BorderRadius.circular(30.0),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 16.0),
-                // ↓↓↓↓ 【修正⑦】ローディング中の見た目を設定 ↓↓↓↓
                 disabledBackgroundColor: Colors.grey[400],
               ),
               icon: isLoading
-                  ? Container( // ローディング中はインジケーターを表示
-                width: 24, height: 24,
+                  ? Container(
+                width: 24,
+                height: 24,
                 padding: const EdgeInsets.all(2.0),
-                child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                child: const CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 3),
               )
-                  : const Icon(Icons.thumb_up_alt_outlined), // 通常時はアイコン
+                  : const Icon(Icons.thumb_up_alt_outlined),
               label: Text(
-                isLoading ? '送信中...' : 'いいね！', // テキストも切り替える
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                isLoading ? '送信中...' : 'いいね！',
+                style:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
           ),
@@ -270,61 +280,62 @@ class _Page_user_profileState extends State<Page_user_profile> {
     );
   }
 
-  // --- (ここから下は、UI表示用のメソッド) ---
-
-  /// メインの写真カード
-  Widget _buildMainPhotoCard(String? profileImageUrl) {
-    return AspectRatio(
-      aspectRatio: 3 / 4,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey[300],
-          image: profileImageUrl != null
-              ? DecorationImage(
-            image: NetworkImage(profileImageUrl),
-            fit: BoxFit.cover,
-          )
-              : null,
+  /// カード内の正方形写真
+  Widget _buildSquarePhoto(String? profileImageUrl) {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16.0),
+          child: Container(
+            color: Colors.grey[200],
+            child: profileImageUrl != null
+                ? Image.network(
+              profileImageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return const Center(child: Icon(Icons.error));
+              },
+            )
+                : const Center(
+                child: Icon(Icons.person, size: 80, color: Colors.grey)),
+          ),
         ),
-        child: profileImageUrl == null
-            ? const Center(child: Icon(Icons.person, size: 100, color: Colors.white))
-            : Align( /* ... (オンライン表示) ... */ ),
       ),
     );
   }
 
-  /// 名前のエリア
-  Widget _buildNameAndLocation(String nickname, String age, String location, String teachSkill, String learnSkill, int exp) {
+  /// 名前・ランク・オンライン・スキル表示
+  Widget _buildNameAndLocation(String nickname, String age, String location,
+      String teachSkill, int exp) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center, // 縦位置を中央揃え
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
-              child:Text(
-              '$nickname $age歳 $location',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
-             ),
+              child: Text(
+                '$nickname $age歳 $location',
+                style:
+                const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            const SizedBox(width: 8), // 名前とバッジの間隔
-
-            // ランク画像を表示
+            const SizedBox(width: 8),
             Image.asset(
-              _getRankImagePath(exp), // 経験値に応じた画像パスを取得
-              height: 30, // 高さを調整 (お好みで変更してください)
+              _getRankImagePath(exp),
+              height: 30,
               fit: BoxFit.contain,
             ),
           ],
         ),
-
-        // 2. オンラインステータス
         const SizedBox(height: 8),
         const Row(
           children: [
-            Icon(Icons.circle, size: 10, color: Colors.green), // 緑の丸
+            Icon(Icons.circle, size: 10, color: Colors.green),
             SizedBox(width: 6),
             Text(
               'オンライン',
@@ -332,94 +343,46 @@ class _Page_user_profileState extends State<Page_user_profile> {
             ),
           ],
         ),
-
         const SizedBox(height: 20),
 
-        // 3. スキル表示エリア (ここが今回のメイン修正)
-        Row(
-          children: [
-            // 教えるよ
-            _buildSkillItem(label: '教えるよ: ', skill: teachSkill),
-
-            const SizedBox(width: 24), // 教えると学びたいの間隔
-
-            // 学びたい
-            _buildSkillItem(label: '学びたい: ', skill: learnSkill),
-          ],
-        ),
+        // 「教えるよ」スキルのみ表示（改行許可）
+        _buildSkillItem(label: '教えるよ: ', skill: teachSkill),
       ],
     );
   }
 
-  /// スキル項目を表示するヘルパーメソッド (黒文字ラベル + シアンバッジ)
+  /// スキルバッジ（改行対応・省略なし）
   Widget _buildSkillItem({required String label, required String skill}) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start, // 複数行になったときに上揃え
       children: [
-        // ラベル (黒字・囲みなし)
-        Text(
-          label,
-          style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.black
+        Padding(
+          padding: const EdgeInsets.only(top: 6.0), // ラベル位置調整
+          child: Text(
+            label,
+            style: const TextStyle(
+                fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
           ),
         ),
-        const SizedBox(width: 8),
-        // スキル名 (白文字・シアン背景・カプセル型)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.cyan,
-            borderRadius: BorderRadius.circular(20), // 丸みを強くしてカプセル型に
-          ),
-          child: Text(
-            skill,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold
+        const SizedBox(width: 4),
+        // Flexibleで横幅に収めつつ、ContainerとTextで改行させる
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.cyan,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              skill,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold),
             ),
           ),
         ),
       ],
     );
-  }
-
-  /// 自己紹介カード
-  Widget _buildSelfIntroductionCard(String selfIntroduction) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '自己紹介文',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              selfIntroduction,
-              style: const TextStyle(fontSize: 16, height: 1.5),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 基本情報カード (まだダミー)
-  Widget _buildBasicInfoCard() {
-    return Card(/* ... */);
-  }
-  /// 興味・関心カード (まだダミー)
-  Widget _buildInterestsCard() {
-    return Card(/* ... */);
-  }
-  /// 基本情報カード内の一行 (まだダミー)
-  Widget _buildInfoRow({required IconData icon, required String label, required String value}) {
-    return Row(/* ... */);
   }
 }
