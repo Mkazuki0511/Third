@@ -68,6 +68,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
+          backgroundColor: Colors.white,
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           // 2, 5つのアイテムに変更
@@ -85,7 +86,7 @@ class _MyHomePageState extends State<MyHomePage> {
             BottomNavigationBarItem(icon: Icon(Icons.person),label: 'アカウント'),
             ],
         type: BottomNavigationBarType.fixed, // 5つのアイテムを均等に配置するために必要
-        selectedItemColor: Colors.blue, // 選択中のアイテムの色
+        selectedItemColor: Colors.cyan, // 選択中のアイテムの色
         unselectedItemColor: Colors.grey, // 選択されていないアイテムの色
       ),
     );
