@@ -112,7 +112,7 @@ class _Page_searchState extends State<Page_search> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F7),
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -233,18 +233,18 @@ class _Page_searchState extends State<Page_search> {
                 },
                 style: const TextStyle(
                   fontSize: 13.0, // 例: 14.0 -> 13.0
-                  color: Colors.black,
+                  color: Color(0xFF4b5153),
                 ),
                 textAlignVertical: TextAlignVertical.center,
                 decoration: InputDecoration(
                   hintText: 'スキルで検索',
                   hintStyle: const TextStyle(
                     fontSize: 13.0, // 入力文字と同じサイズに合わせる
-                    color: Colors.grey,
+                    color: Color(0xFF4b5153),
                   ),
-                  prefixIcon: const Icon(Icons.search, size: 20),
+                  prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF4b5153)),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: const Color(0xFFeeeef0),
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(
                       vertical: 0.0,
@@ -260,7 +260,7 @@ class _Page_searchState extends State<Page_search> {
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: const Icon(Icons.filter_list, color: Color(0xFF4b5153)),
             onPressed: onFilterPressed,
           ),
         ],
