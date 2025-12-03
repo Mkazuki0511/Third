@@ -112,7 +112,7 @@ class _Page_searchState extends State<Page_search> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: const Color(0xFFF7F7F7),
       body: SafeArea(
         child: Column(
           children: [
@@ -497,7 +497,7 @@ class _Page_searchState extends State<Page_search> {
                 children: [
                   Text(
                     '$age歳 $location',
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 4),
                   Row(
@@ -507,7 +507,7 @@ class _Page_searchState extends State<Page_search> {
                       Expanded(
                         child: Text(
                           teachSkill, // 教えるスキル
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
