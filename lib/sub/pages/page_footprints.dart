@@ -13,6 +13,27 @@ class _PageFootprintsState extends State<PageFootprints> {
   final User? currentUser = FirebaseAuth.instance.currentUser;
 
   @override
+  void initState() {
+    super.initState();
+    _markAsChecked();
+  }
+
+  Future<void> _markAsChecked() async {
+    if (currentUser == null) return;
+    try {
+      // 自分のドキュメントに「最後に足あとを確認した日時」を記録
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser!.uid)
+          .update({
+        'lastCheckedFootprints': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('既読更新エラー: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(

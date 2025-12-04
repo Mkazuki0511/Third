@@ -417,10 +417,11 @@ class Page_profile extends StatelessWidget {
 
   /// メニューリスト (まだダミー)
   Widget _buildMenuList(BuildContext context, Map<String, dynamic> userData) {
-    // 現在のユーザーIDを取得するために FirebaseAuth を利用
     final User? currentUser = FirebaseAuth.instance.currentUser;
-    // ログインしていない場合は何も表示しない（念のため）
     if (currentUser == null) return const SizedBox.shrink();
+
+    final Timestamp? lastCheckedTs = userData['lastCheckedFootprints'];
+    final DateTime lastChecked = lastCheckedTs?.toDate() ?? DateTime(2000);
 
     return Card(
       color: Colors.white,
@@ -461,8 +462,19 @@ class Page_profile extends StatelessWidget {
             );
           }
 
-          // ★取得したドキュメントの「数」を件数として取得
+          final docs = snapshot.data!.docs;
           final int footprintCount = snapshot.data!.docs.length;
+
+          int unreadCount = 0;
+          for (var doc in docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final Timestamp? ts = data['timestamp'];
+
+            // 足あとの日時が、最終確認日時より「後(未来)」なら未読とみなす
+            if (ts != null && ts.toDate().isAfter(lastChecked)) {
+              unreadCount++;
+            }
+          }
 
           return ListTile(
             leading: const Icon(Icons.visibility, color: Colors.grey),
@@ -470,9 +482,7 @@ class Page_profile extends StatelessWidget {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-
-                // 件数が0より大きい場合のみ、青いバッジを表示
-                if (footprintCount > 0)
+                if (unreadCount > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -480,11 +490,11 @@ class Page_profile extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      footprintCount.toString(), // ★本物の件数
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      unreadCount.toString(), // 未読件数を表示
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   )
-                // 0件の場合は '0' と表示
+
                 else
                   const Text('0', style: TextStyle(color: Colors.grey, fontSize: 16)),
 
