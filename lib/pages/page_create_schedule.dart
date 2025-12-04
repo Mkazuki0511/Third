@@ -21,12 +21,13 @@ class _Page_create_scheduleState extends State<Page_create_schedule> {
   //MatchWithUser? _selectedMatch; // ← 選択された「マッチ相手」
   DateTime? _selectedDate;      // 「日付」
   TimeOfDay? _selectedTime;    // 「時間」
+  String? _selectedMethod;    // 「方法」
   final TextEditingController _serviceController = TextEditingController();
 
   bool _isLoading = false;
-
-  // ↓↓↓↓ 【重要】FutureBuilder が2回実行されるのを防ぐため ↓↓↓↓
   late Future<List<MatchWithUser>> _matchesFuture;
+  final List<String> _exchangeMethods = ['オンライン', '対面'];
+
 
   @override
   void initState() {
@@ -111,7 +112,11 @@ class _Page_create_scheduleState extends State<Page_create_schedule> {
   /// --- 4. 「予定」をFirestoreに保存するロジック ---
   Future<void> _saveSchedule() async {
     // バリデーション (入力チェック)
-    if (_selectedOpponentId == null || _selectedDate == null || _selectedTime == null || _serviceController.text.isEmpty) {
+    if (_selectedOpponentId == null ||
+        _selectedDate == null ||
+        _selectedTime == null ||
+        _serviceController.text.isEmpty ||
+        _selectedMethod == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('すべての項目を入力してください')),
       );
@@ -142,6 +147,15 @@ class _Page_create_scheduleState extends State<Page_create_schedule> {
         _selectedTime!.hour,
         _selectedTime!.minute,
       );
+      if (scheduleDateTime.isBefore(DateTime.now())) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('過去の日時は選択できません。未来の日時を指定してください。')),
+          );
+        }
+        return; // ここで処理を中断（finallyブロックに進んでローディングは解除されます）
+      }
+
       final Timestamp scheduleTimestamp = Timestamp.fromDate(scheduleDateTime);
 
       // 'schedules' コレクションに新しいドキュメントを追加
@@ -153,6 +167,7 @@ class _Page_create_scheduleState extends State<Page_create_schedule> {
         'createdAt': FieldValue.serverTimestamp(),
         'receiverId': _currentUserUid,       // 利用する人 (自分) = 申請者
         'providerId': _selectedOpponentId, // 提供する人 (相手) = 承認者
+        'method': _selectedMethod,
       };
 
       // 3. トランザクションを実行
@@ -241,7 +256,30 @@ class _Page_create_scheduleState extends State<Page_create_schedule> {
                   items: snapshot.data!.map((match) {
                     return DropdownMenuItem<String>(
                       value: match.opponentId, // value は String (相手のID)
-                      child: Text(match.opponentNickname), // 相手のニックネーム
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircleAvatar(
+                            radius: 12, // 小さめに表示
+                            backgroundColor: Colors.grey[300],
+                            backgroundImage: match.opponentImageUrl != null
+                                ? NetworkImage(match.opponentImageUrl!)
+                                : null,
+                            child: match.opponentImageUrl == null
+                                ? const Icon(Icons.person, size: 16, color: Colors.white)
+                                : null,
+                          ),
+                          const SizedBox(width: 12), // 画像と名前の間隔
+
+                          // 名前
+                          Flexible( // 名前が長い場合に備えてExpandedで囲む
+                            child: Text(
+                              match.opponentNickname,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ), // 相手のニックネーム
                     );
                   }).toList(),
                   onChanged: (String? newValue) {
@@ -266,7 +304,28 @@ class _Page_create_scheduleState extends State<Page_create_schedule> {
             ),
             const SizedBox(height: 24),
 
-            // --- 3. 「いつ」 (日付と時間) ---
+            // --- 3. 「交換方法」 (オンラインor対面) ---
+            const Text('どのように交換しますか？', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _selectedMethod,
+              hint: const Text('方法を選択'),
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+              items: _exchangeMethods.map((method) {
+                return DropdownMenuItem(
+                  value: method,
+                  child: Text(method),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedMethod = newValue;
+                });
+              },
+            ),
+            const SizedBox(height: 24),
+
+            // --- 4. 「いつ」 (日付と時間) ---
             const Text('いつ交換しますか？', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             // 日付選択
