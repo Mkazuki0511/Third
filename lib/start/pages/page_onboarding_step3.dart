@@ -1,5 +1,5 @@
 import 'dart:io'; // ← Fileクラスを使うために必要
-import 'package:flutter/foundation.dart' show kIsWeb; // ← 【修正①】kIsWebをインポート
+import 'package:flutter/foundation.dart' show kIsWeb; // ← kIsWebをインポート
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart'; // ← image_picker をインポート
 import 'package:firebase_storage/firebase_storage.dart'; // ← Storage をインポート
@@ -16,28 +16,30 @@ class Page_onboarding_step3 extends StatefulWidget {
 }
 
 class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
-
-  // Firebaseのインスタンス
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // ↓↓↓↓ 【修正②】File? から XFile? に変更 ↓↓↓↓
-  XFile? _imageFile; // File? _image;
-  bool _isLoading = false;
-
-  // ImagePickerのインスタンス
   final ImagePicker _picker = ImagePicker();
 
-  /// --- 1. 画像を選択するロジック ---
-  Future<void> _pickImage(ImageSource source) async {
+
+  XFile? _mainImageFile; // メイン写真
+  final List<XFile> _subImageFiles = []; // サブ写真リスト (最大6枚)
+  bool _isLoading = false;
+
+
+  Future<void> _pickImage(ImageSource source, {bool isMain = true}) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(source: source);
 
       if (pickedFile != null) {
-        // ↓↓↓↓ 【修正③】pickedFileをそのままセット ↓↓↓↓
         setState(() {
-          _imageFile = pickedFile; // File(pickedFile.path) にしない
+          if (isMain) {
+            _mainImageFile = pickedFile;
+          } else {
+            if (_subImageFiles.length < 6) {
+              _subImageFiles.add(pickedFile);
+            }
+          }
         });
         if (mounted) Navigator.of(context).pop(); // モーダルを閉じる
       }
@@ -47,12 +49,56 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
     }
   }
 
-  /// --- 2. 画像をアップロードして次に進むロジック ---
+  void _removeSubImage(int index) {
+    setState(() {
+      _subImageFiles.removeAt(index);
+    });
+  }
+
+  void _showImagePickerModal(BuildContext context, {bool isMain = true}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 24),
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('ライブラリから選ぶ'),
+                  onTap: () => _pickImage(ImageSource.gallery, isMain: isMain),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('写真を撮る'),
+                  onTap: () => _pickImage(ImageSource.camera, isMain: isMain),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => Navigator.of(modalContext).pop(),
+                  child: const Text('閉じる', style: TextStyle(color: Colors.grey)),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 画像をアップロードして次に進むロジック
   Future<void> _uploadAndNavigate() async {
     // 1. 画像が選択されているかチェック
-    if (_imageFile == null) {
+    if (_mainImageFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('まず、写真を選択してください')),
+        const SnackBar(content: Text('まず、メイン写真を選択してください')),
       );
       return; // 処理を中断
     }
@@ -72,28 +118,42 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
 
     try {
       // 3. Storageにアップロード
-      final String filePath = 'profile_images/${user.uid}/main_profile.jpg';
-      final ref = _storage.ref().child(filePath);
+      // メイン写真のアップロード
+      String mainImageUrl = '';
+      final String mainPath = 'profile_images/${user.uid}/main_profile.jpg';
+      final mainRef = _storage.ref().child(mainPath);
 
-      // ↓↓↓↓ 【修正④】kIsWeb でアップロード方法を分岐 ↓↓↓↓
       if (kIsWeb) {
         // Webの場合：Uint8List (バイトデータ) としてアップロード
-        await ref.putData(await _imageFile!.readAsBytes());
+        await mainRef.putData(await _mainImageFile!.readAsBytes());
       } else {
         // Mobileの場合：File としてアップロード
-        await ref.putFile(File(_imageFile!.path));
+        await mainRef.putFile(File(_mainImageFile!.path));
       }
-      // ↑↑↑↑ 【ここまで】 ↑↑↑↑
+      mainImageUrl = await mainRef.getDownloadURL();
 
-      // 4. アップロードした画像のURLを取得
-      final String downloadUrl = await ref.getDownloadURL();
+      // サブ写真のアップロード
+      List<String> subImageUrls = [];
+      for (int i = 0; i < _subImageFiles.length; i++) {
+        final String subPath = 'profile_images/${user.uid}/sub_profile_$i.jpg';
+        final subRef = _storage.ref().child(subPath);
 
-      // 5. Firestoreのユーザー情報を更新
+        if (kIsWeb) {
+          await subRef.putData(await _subImageFiles[i].readAsBytes());
+        } else {
+          await subRef.putFile(File(_subImageFiles[i].path));
+        }
+        final String url = await subRef.getDownloadURL();
+        subImageUrls.add(url);
+      }
+
+      // 4. Firestoreのユーザー情報を更新
       await _firestore.collection('users').doc(user.uid).update({
-        'profileImageUrl': downloadUrl, // FirestoreのURLを更新
+        'profileImageUrl': mainImageUrl,
+        'subProfileImageUrls': subImageUrls,
       });
 
-      // 6. 成功したら次のStep4（詳細プロフ）へ
+      // 5. 成功したら次のStep4（詳細プロフ）へ
       if (mounted) {
         Navigator.push(context, MaterialPageRoute(
           builder: (context) => const Page_onboarding_step4(),
@@ -117,72 +177,6 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
     }
   }
 
-
-  // 「メイン写真を登録する」ボタンが押されたときの処理
-  void _showImagePickerModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (modalContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 24),
-                ListTile(
-                  leading: const Icon(Icons.photo_library),
-                  title: const Text('ライブラリから選ぶ'),
-                  onTap: () {
-                    // ↓↓↓↓ 【ここがロジック】 ↓↓↓↓
-                    _pickImage(ImageSource.gallery);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.camera_alt),
-                  title: const Text('写真を撮る'),
-                  onTap: () {
-                    // ↓↓↓↓ 【ここがロジック】 ↓↓↓↓
-                    _pickImage(ImageSource.camera);
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () => Navigator.of(modalContext).pop(),
-                  child: const Text('閉じる', style: TextStyle(color: Colors.grey)),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-
-  Widget _buildBadge(String text) {
-    return Column(
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: Colors.grey[300],
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(Icons.error_outline, color: Colors.red), // ダミー
-        ),
-        const SizedBox(height: 4),
-        Text(text, style: const TextStyle(fontSize: 10)),
-      ],
-    );
-  }
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -195,11 +189,11 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      // ↓↓↓↓ 【ローディングUIの追加】 ↓↓↓↓
+
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -211,7 +205,7 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
             ),
             const SizedBox(height: 32),
 
-            // --- 2. メイン写真のプレビュー (変更！) ---
+            // メイン写真
             Center(
               // ↓↓↓↓ 【タップ可能にする】 ↓↓↓↓
               child: GestureDetector(
@@ -220,42 +214,100 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
                   _showImagePickerModal(context);
                 },
                 child: Container(
-                  width: 250,
-                  height: 300,
-                  padding: const EdgeInsets.all(16.0),
+                  width: 180,
+                  height: 180,
                   decoration: BoxDecoration(
                     color: Colors.cyan[50],
                     shape: BoxShape.circle,
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade300),
-                      // ↓↓↓↓ 【画像が選択されたら表示】 ↓↓↓↓
-                      image: _imageFile != null
-                          ? DecorationImage(
-                              image: (kIsWeb
-                                  ? NetworkImage(_imageFile!.path) // Web用
-                                  : FileImage(File(_imageFile!.path)) // Mobile用
-                              ) as ImageProvider,
-                        fit: BoxFit.cover,
-                      )
-                          : null,
-                    ),
-                    // ↓↓↓↓ 【画像がなければアイコン表示】 ↓↓↓↓
-                    child: _imageFile == null
-                        ? const Center(
-                      child: Icon(Icons.person_add_alt_1, size: 80, color: Colors.grey),
-                    )
+                    image: _mainImageFile  != null
+                        ? DecorationImage(
+                      image: (kIsWeb
+                          ? NetworkImage(_mainImageFile!.path)
+                          : FileImage(File(_mainImageFile!.path))) as ImageProvider,
+                      fit: BoxFit.cover,
+                  )
                         : null,
+                    border: Border.all(color: Colors.grey.shade300),
                   ),
+                  child: _mainImageFile == null
+                      ? const Icon(Icons.person_add_alt_1, size: 60, color: Colors.grey)
+                      : null,
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
+            const Text('メイン写真', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 32),
 
-            // --- 3. 登録ボタン (変更！) ---
+            // --- サブ写真エリア ---
+            const Text(
+              'サブ写真 (最大6枚)',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemCount: _subImageFiles.length + (_subImageFiles.length < 6 ? 1 : 0),
+              itemBuilder: (context, index) {
+                // 「追加ボタン」を表示する場合
+                if (index == _subImageFiles.length) {
+                  return GestureDetector(
+                    onTap: () => _showImagePickerModal(context, isMain: false),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: const Icon(Icons.add, color: Colors.grey),
+                    ),
+                  );
+                }
+
+                // 選択済み画像を表示する場合
+                final file = _subImageFiles[index];
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        image: DecorationImage(
+                          image: (kIsWeb
+                              ? NetworkImage(file.path)
+                              : FileImage(File(file.path))) as ImageProvider,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    // 削除ボタン
+                    Positioned(
+                      top: -8,
+                      right: -8,
+                      child: GestureDetector(
+                        onTap: () => _removeSubImage(index),
+                        child: const CircleAvatar(
+                          radius: 12,
+                          backgroundColor: Colors.red,
+                          child: Icon(Icons.close, size: 16, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 32),
+
+
+            // --- 登録ボタン ---
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.cyan,
@@ -268,7 +320,7 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
                 disabledBackgroundColor: Colors.grey[300],
               ),
               // ↓↓↓↓ 【画像がなければ押せない(null)、あれば _uploadAndNavigate を呼ぶ】 ↓↓↓↓
-              onPressed: _imageFile != null ? _uploadAndNavigate : null,
+              onPressed: _mainImageFile != null ? _uploadAndNavigate : null,
               child: const Text(
                 '次へ', // ← 文言を「次へ」に変更
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -276,7 +328,7 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
             ),
             const SizedBox(height: 16),
 
-            // --- 4. スキップボタン (新設) ---
+            // --- スキップボタン ---
             // メイン写真の登録は必須ではない（あとからでも良い）場合
             TextButton(
               onPressed: () {
