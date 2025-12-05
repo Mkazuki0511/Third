@@ -16,12 +16,15 @@ class Page_user_profile extends StatefulWidget {
 }
 
 class _Page_user_profileState extends State<Page_user_profile> {
-  // Firebaseのインスタンス
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // 「いいね！」ボタンのローディング状態
   bool _isLoading = false;
+
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
 
   // ランク画像判定
   String _getRankImagePath(int exp) {
@@ -131,7 +134,8 @@ class _Page_user_profileState extends State<Page_user_profile> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5), // ベース背景色
+      backgroundColor: const Color(0xFFF5F5F5),
+      // ベース背景色
       // extendBodyBehindAppBar: true, // ← 削除（カードがヘッダーに被らないようにするため）
       appBar: AppBar(
         backgroundColor: const Color(0xFFF5F5F5), // 背景色と合わせる
@@ -159,6 +163,20 @@ class _Page_user_profileState extends State<Page_user_profile> {
           final userData = snapshot.data!.data()!;
           final String nickname = userData['nickname'] ?? '名前なし';
           final String? profileImageUrl = userData['profileImageUrl'];
+
+          final List<
+              dynamic> subImagesDynamic = userData['subProfileImageUrls'] ?? [];
+          final List<String> subImageUrls = subImagesDynamic.cast<String>();
+
+          final List<String> rawImages = [];
+          if (profileImageUrl != null) rawImages.add(profileImageUrl);
+          rawImages.addAll(subImageUrls);
+
+          final List<String> allImages = rawImages.toSet().toList();
+
+          print('画像の枚数: ${allImages.length}');
+          print('画像リスト: $allImages');
+
           final String location = userData['location'] ?? '未設定';
           final Timestamp? birthdayTimestamp = userData['birthday'];
           final String age = _calculateAge(birthdayTimestamp);
@@ -192,7 +210,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // 1. 写真（カード内）
-                        _buildSquarePhoto(profileImageUrl),
+                        PhotoSlider(images: allImages),
 
                         // 2. 詳細情報
                         Padding(
@@ -280,32 +298,6 @@ class _Page_user_profileState extends State<Page_user_profile> {
     );
   }
 
-  /// カード内の正方形写真
-  Widget _buildSquarePhoto(String? profileImageUrl) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(30, 30, 30, 0),
-      child: AspectRatio(
-        aspectRatio: 1.0,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16.0),
-          child: Container(
-            color: Colors.grey[200],
-            child: profileImageUrl != null
-                ? Image.network(
-              profileImageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return const Center(child: Icon(Icons.error));
-              },
-            )
-                : const Center(
-                child: Icon(Icons.person, size: 80, color: Colors.grey)),
-          ),
-        ),
-      ),
-    );
-  }
-
   /// 名前・ランク・オンライン・スキル表示
   Widget _buildNameAndLocation(String nickname, String age, String location,
       String teachSkill, int exp) {
@@ -383,6 +375,107 @@ class _Page_user_profileState extends State<Page_user_profile> {
           ),
         ),
       ],
+    );
+  }
+}
+
+
+// 画像スライダー
+class PhotoSlider extends StatefulWidget {
+  final List<String> images;
+
+  const PhotoSlider({super.key, required this.images});
+
+  @override
+  State<PhotoSlider> createState() => _PhotoSliderState();
+}
+
+class _PhotoSliderState extends State<PhotoSlider> {
+  final PageController _pageController = PageController();
+  int _currentImageIndex = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 画像がない場合の処理
+    if (widget.images.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(30, 30, 30, 0),
+        child: AspectRatio(
+          aspectRatio: 1.0,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(16.0),
+            ),
+            child: const Center(
+                child: Icon(Icons.person, size: 80, color: Colors.grey)),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(30, 30, 30, 0),
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16.0),
+          child: Stack(
+            children: [
+              PageView.builder(
+                controller: _pageController,
+                itemCount: widget.images.length,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentImageIndex = index;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  return Image.network(
+                    widget.images[index],
+                    // 重要: Keyを追加して、Flutterに別の画像であることを認識させる
+                    key: ValueKey(widget.images[index]),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                    const Center(child: Icon(Icons.error)),
+                  );
+                },
+              ),
+              // インジケーター
+              if (widget.images.length > 1)
+                Positioned(
+                  bottom: 16,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(widget.images.length, (index) {
+                      final bool isActive = index == _currentImageIndex;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        height: 8,
+                        width: isActive ? 24 : 8,
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
