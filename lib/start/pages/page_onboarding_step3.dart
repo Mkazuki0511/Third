@@ -36,7 +36,7 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
           if (isMain) {
             _mainImageFile = pickedFile;
           } else {
-            if (_subImageFiles.length < 6) {
+            if (_subImageFiles.length < 5) {
               _subImageFiles.add(pickedFile);
             }
           }
@@ -213,35 +213,64 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
                   // プレビュー画像をタップしてもモーダルが開くようにする
                   _showImagePickerModal(context);
                 },
-                child: Container(
+                child: Stack(
+                  clipBehavior: Clip.none, // ＋ボタンが少しはみ出ても表示されるようにする
+                  alignment: Alignment.bottomRight, // 右下に配置
+                children: [
+                  Container(
                   width: 180,
                   height: 180,
                   decoration: BoxDecoration(
-                    color: Colors.cyan[50],
-                    shape: BoxShape.circle,
+                    color: Colors.grey[100],
+                    shape: BoxShape.rectangle,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
                     image: _mainImageFile  != null
                         ? DecorationImage(
                       image: (kIsWeb
                           ? NetworkImage(_mainImageFile!.path)
                           : FileImage(File(_mainImageFile!.path))) as ImageProvider,
                       fit: BoxFit.cover,
-                  )
+                    )
                         : null,
-                    border: Border.all(color: Colors.grey.shade300),
                   ),
                   child: _mainImageFile == null
-                      ? const Icon(Icons.person_add_alt_1, size: 60, color: Colors.grey)
+                      ? const Icon(
+                      Icons.person,
+                      size: 100,
+                      color: Colors.grey)
                       : null,
                 ),
+                // 2. 右下の「＋」ボタン
+                Positioned(
+                bottom: -10, // 位置の微調整（少し外側に出す場合）
+                right: -10,
+                child: Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                color: Colors.cyan, // 参考画像に近い青紫色（お好みでColors.blueなど）
+                shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                Icons.add,
+                color: Colors.white,
+                size: 24,
               ),
             ),
+          ),
+        ],
+      ),
+    ),
+  ),
+
             const SizedBox(height: 8),
             const Text('メイン写真', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 32),
 
             // --- サブ写真エリア ---
             const Text(
-              'サブ写真 (最大6枚)',
+              'サブ写真 (最大5枚)',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
@@ -254,7 +283,7 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
-              itemCount: _subImageFiles.length + (_subImageFiles.length < 6 ? 1 : 0),
+              itemCount: _subImageFiles.length + (_subImageFiles.length < 5 ? 1 : 0),
               itemBuilder: (context, index) {
                 // 「追加ボタン」を表示する場合
                 if (index == _subImageFiles.length) {
