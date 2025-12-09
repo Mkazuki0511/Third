@@ -32,6 +32,11 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.white),
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF7F7F7),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFF7F7F7), // 背景色
+          elevation: 0,                       // ★影を消してフラットにするなら0、残すなら数値を指定
+        ),
       ),
        home: const LobbyPage(), //最初の画面
     );

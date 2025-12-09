@@ -112,7 +112,7 @@ class _Page_searchState extends State<Page_search> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      //backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [

@@ -26,14 +26,14 @@ class _Page_messageState extends State<Page_message> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      //backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'トーク',
           style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold, color: Colors.black),
         ),
         centerTitle: true, // 中央揃え
-        backgroundColor: Colors.white,
+        //backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
       ),

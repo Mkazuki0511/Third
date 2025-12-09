@@ -43,16 +43,16 @@ class _Page_scheduleState extends State<Page_schedule> {
         .snapshots();
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      //backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           '予定',
           style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold, color: Colors.black),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        //backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-        elevation: 1.0,
+        elevation: 0,
         actions: [
           // ↓↓↓↓ 【修正③】AppBarのアイコンロジック（15:28の計画） ↓↓↓↓
           // _isProvidingSelected が true（提供）なら 🔔
@@ -344,10 +344,21 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
         // 11. UIを構築 (Schedule_2.png のデザイン)
         final Color statusColor = (status == '予約確定') ? Colors.cyan : Colors.grey;
 
-        return Card(
+        return Container(
           margin: const EdgeInsets.only(bottom: 16.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
-          elevation: 2.0,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1), // 影の色（薄い黒）
+              spreadRadius: 1, // 影の広がり範囲
+              blurRadius: 8,   // 影のぼかし具合
+              offset: const Offset(0, 0), // ★ここを (0, 0) にすると影が上下左右均等（真ん中）になります
+            ),
+          ],
+        ),
+
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -361,7 +372,7 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                       padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
                       decoration: BoxDecoration(
                         color: statusColor,
-                        borderRadius: BorderRadius.circular(4.0),
+                        borderRadius: BorderRadius.circular(0.0),
                       ),
                       child: Text(
                         status,
@@ -381,12 +392,20 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 左側の画像
-                    CircleAvatar(
-                      radius: 40, // (80x80 のコンテナの代わりに)
-                      backgroundColor: Colors.grey[300],
-                      backgroundImage: profileImageUrl != null
-                          ? NetworkImage(profileImageUrl)
-                          : null,
+                    Container(
+                      width: 100,  // 横幅
+                      height: 100, // 高さ（ここを大きくすると縦長になります）
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300], // 画像がない時の背景色
+                        borderRadius: BorderRadius.circular(8.0), // 角を少し丸くする
+                        image: profileImageUrl != null
+                            ? DecorationImage(
+                          image: NetworkImage(profileImageUrl),
+                          fit: BoxFit.cover, // 枠に合わせて画像を切り取る（歪まない）
+                        )
+                            : null,
+                      ),
+                      // 画像がない場合は人型アイコンを表示
                       child: profileImageUrl == null
                           ? const Icon(Icons.person, size: 40, color: Colors.white)
                           : null,
@@ -399,8 +418,8 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '$nickname $location ($age歳)', // ← 本物のデータに
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            '$nickname $location $age歳', // ← 本物のデータに
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 12),
                           Container(
@@ -416,13 +435,13 @@ class _ScheduleCardItemState extends State<_ScheduleCardItem> {
                                 Text(widget.isProviderView
                                     ? '提供サービス'
                                     : 'ご利用サービス',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey[700])
+                                    style: TextStyle(fontSize: 10, color: Colors.grey[700])
                                 ),
                                 const SizedBox(height: 4),
 
                                 Text(
                                     service, // ← 本物のサービス名に
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)
                                 ),
                               ],
                             ),
