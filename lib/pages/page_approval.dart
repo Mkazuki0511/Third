@@ -205,6 +205,20 @@ class _RequestCardState extends State<_RequestCard> {
     return age.toString();
   }
 
+  String _getRankImagePath(int exp) {
+    if (exp >= 3500) {
+      return 'assets/images/Lank_Legend.png';
+    } else if (exp >= 1800) {
+      return 'assets/images/Lank_Mentor.png';
+    } else if (exp >= 900) {
+      return 'assets/images/Lank_Partner.png';
+    } else if (exp >= 300) {
+      return 'assets/images/Lank_Learner.png';
+    } else {
+      return 'assets/images/Lank_Beginner.png';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 6. `FutureBuilder` でユーザーデータの読み込みを待つ
@@ -228,69 +242,118 @@ class _RequestCardState extends State<_RequestCard> {
         final String location = userData['location'] ?? '未設定';
         final Timestamp? birthdayTimestamp = userData['birthday'];
         final String age = _calculateAge(birthdayTimestamp);
-        final String teachSkill = userData['teachSkill'] ?? 'スキル未設定';
-        // (Consent.png には「学びたい」は表示されていないが、必要なら追加)
-        // final String learnSkill = userData['learnSkill'] ?? 'スキル未設定';
+        final String selfIntroduction = userData['selfIntroduction'] ?? '自己紹介はありません。';
+        final int experiencePoints = userData['experiencePoints'] ?? 0;
 
-
-        // 8. 取得したデータを使って「承認カードUI」を構築
-        // (page_onboarding_step3 で使ったUIを流用)
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
           child: Column(
             children: [
-              Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+              // 1. プロフィールカード本体 (デザインをプロフィールページに合わせる)
+              Container(
                 clipBehavior: Clip.antiAlias,
-                elevation: 4.0,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20.0), // プロフィールページと同じ丸み
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05), // プロフィールページと同じ薄い影
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // メイン画像
-                    AspectRatio(
-                      aspectRatio: 1 / 1, // 正方形
-                      child: profileImageUrl != null
-                          ? Image.network(profileImageUrl, fit: BoxFit.cover)
-                          : Container(color: Colors.grey[300], child: const Icon(Icons.person, size: 80, color: Colors.white)),
+                    // 画像 (正方形)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(30, 30, 30, 30),
+                      child: AspectRatio(
+                        aspectRatio: 1 / 1,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16.0),
+                        child: profileImageUrl != null
+                            ? Image.network(profileImageUrl, fit: BoxFit.cover)
+                            : Container(
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.person, size: 80, color: Colors.white),
+                        )),
+                      ),
                     ),
 
-                    // 下部の情報エリア
+                    // 情報エリア
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '$nickname $age歳 $location',
-                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
+                          // 名前・年齢・地域・ランク
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Icon(Icons.chat_bubble_outline, size: 16, color: Colors.grey[700]),
-                              Flexible(
-                                child: Text(
-                                  '「$teachSkill」を教えて欲しいです。', // ダミーの依頼文
-                                  style: const TextStyle(fontSize: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      nickname,
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '$age歳  $location',
+                                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                                    ),
+                                  ],
                                 ),
+                              ),
+                              // ランクアイコン
+                              Image.asset(
+                                _getRankImagePath(experiencePoints),
+                                height: 30, // 少し大きめに
+                                fit: BoxFit.contain,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
+
+                          const SizedBox(height: 12),
+                          const Divider(height: 1),
+                          const SizedBox(height: 12),
+
+                          // ★ 自己紹介 (最大3行で省略)
+                          Text(
+                            selfIntroduction,
+                            maxLines: 3, // 3行まで表示
+                            overflow: TextOverflow.ellipsis, // 末尾を ... にする
+                            style: const TextStyle(
+                              fontSize: 14,
+                              height: 1.5, // 行間を少し開ける
+                              color: Colors.black87,
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // 「詳しく見る」ボタン
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton(
                               onPressed: () {
-                                // 「詳しく見る」で他人のプロフィールページへ
                                 Navigator.push(context, MaterialPageRoute(
-                                  builder: (context) =>  Page_user_profile(userId: widget.fromId),
+                                  builder: (context) => Page_user_profile(userId: widget.fromId),
                                 ));
                               },
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.black,
-                                side: const BorderSide(color: Colors.grey),
+                                foregroundColor: Colors.cyan, // テキスト色
+                                side: const BorderSide(color: Colors.cyan), // 枠線色
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30.0),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
-                              child: const Text('詳しく見る'),
+                              child: const Text('詳しく見る', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
@@ -300,7 +363,7 @@ class _RequestCardState extends State<_RequestCard> {
                 ),
               ),
 
-              // 9. 「承認」「スキップ」ボタン
+              // 2. 「承認」「スキップ」ボタン (カードの外、下部に配置)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24.0),
                 child: Row(
@@ -309,16 +372,16 @@ class _RequestCardState extends State<_RequestCard> {
                     _buildCircleButton(
                       icon: Icons.close,
                       text: 'スキップ',
-                      color: Colors.grey,
-                      iconColor: Colors.white,
-                      onPressed: widget.onSkip, // ← スキップロジックを呼ぶ
+                      color: Colors.grey, // 背景白
+                      iconColor: Colors.white, // アイコンと文字をグレーに
+                      onPressed: widget.onSkip,
                     ),
                     _buildCircleButton(
                       icon: Icons.check,
                       text: '承認',
-                      color: Colors.cyan,
+                      color: Colors.cyan, // メインカラー
                       iconColor: Colors.white,
-                      onPressed: widget.onApprove, // ← 承認ロジックを呼ぶ
+                      onPressed: widget.onApprove,
                     ),
                   ],
                 ),
