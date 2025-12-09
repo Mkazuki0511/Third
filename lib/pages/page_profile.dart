@@ -261,9 +261,6 @@ class Page_profile extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: ribbonColor,
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
-                      ],
                     ),
                     child: Text(
                       rankName,
