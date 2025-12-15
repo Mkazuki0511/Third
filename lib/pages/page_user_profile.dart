@@ -185,6 +185,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
           final String teachSkill = userData['teachSkill'] ?? '未設定';
           // final String learnSkill = userData['learnSkill'] ?? '未設定'; // 今回は使わない
           final int experiencePoints = userData['experiencePoints'] ?? 0;
+          final Timestamp? lastActiveAt = userData['lastActiveAt'];
 
           return SingleChildScrollView(
             // 下部にボタン用の余白を確保
@@ -224,6 +225,7 @@ class _Page_user_profileState extends State<Page_user_profile> {
                                 location,
                                 teachSkill,
                                 experiencePoints,
+                                lastActiveAt,
                               ),
                               const SizedBox(height: 24),
                               const Divider(height: 1),
@@ -300,7 +302,30 @@ class _Page_user_profileState extends State<Page_user_profile> {
 
   /// 名前・ランク・オンライン・スキル表示
   Widget _buildNameAndLocation(String nickname, String age, String location,
-      String teachSkill, int exp) {
+      String teachSkill, int exp, Timestamp? lastActiveAt) {
+
+    // --- オンライン判定ロジック ---
+    bool isOnline = false;
+    String statusText = 'オフライン';
+
+    if (lastActiveAt != null) {
+      final DateTime lastActiveDate = lastActiveAt.toDate();
+      final DateTime now = DateTime.now();
+      final int diffMinutes = now.difference(lastActiveDate).inMinutes;
+
+    // 「10分以内」にアクセスがあればオンラインとみなす
+      if (diffMinutes < 10) {
+        isOnline = true;
+        statusText = 'オンライン';
+      } else if (diffMinutes < 60) {
+        statusText = '$diffMinutes分前にオンライン';
+      } else if (diffMinutes < 1440) { // 24時間以内
+        statusText = '${(diffMinutes / 60).floor()}時間前にオンライン';
+      } else {
+        statusText = '${(diffMinutes / 1440).floor()}日前にオンライン';
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -325,12 +350,16 @@ class _Page_user_profileState extends State<Page_user_profile> {
           ],
         ),
         const SizedBox(height: 8),
-        const Row(
+        Row(
           children: [
-            Icon(Icons.circle, size: 10, color: Colors.green),
-            SizedBox(width: 6),
+            Icon(
+              Icons.circle,
+              size: 10,
+              color: isOnline ? Colors.green : Colors.grey,
+            ),
+            const SizedBox(width: 6),
             Text(
-              'オンライン',
+              statusText,
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],

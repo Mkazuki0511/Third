@@ -9,6 +9,8 @@ import 'package:third/pages/page_approval.dart';
 import 'package:third/pages/page_schedule.dart';
 import 'firebase_options.dart';
 import 'package:third/sub/pages/page_profile.edit.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 
 void main() async {
@@ -51,7 +53,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   static final _pages = [
      const Page_search(), // 0:探す
      const Page_approval(), // 1: 承認
@@ -66,6 +68,45 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // 2. ライフサイクル監視を開始
+    WidgetsBinding.instance.addObserver(this);
+    // 初期化時にステータスを更新
+    _updateUserStatus(true);
+  }
+
+  @override
+  void dispose() {
+    // 3. 監視を終了
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // 4. アプリの状態が変わった時に呼ばれる (開いた/閉じた)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // アプリが前面に来た -> オンライン
+      _updateUserStatus(true);
+    } else {
+      // アプリがバックグラウンドに行った -> オフライン扱いに更新（または最終アクセス時刻のみ更新）
+      _updateUserStatus(false);
+    }
+  }
+
+  // 5. Firestoreにステータスを書き込む関数
+  Future<void> _updateUserStatus(bool isOnline) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'isOnline': isOnline, // (任意) シンプルなフラグ
+        'lastActiveAt': FieldValue.serverTimestamp(), // ★これが重要
+      });
+    }
   }
 
   @override
