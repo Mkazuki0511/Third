@@ -21,7 +21,7 @@ class LobbyPage extends StatelessWidget {
             children: [
               // --- 1. ロゴ ---
               // Spacer を使って、ロゴを画面の上半分の中央に配置
-              const Spacer(flex: 2),
+              const Spacer(flex: 3),
               Image.asset(
                 'assets/images/skill_link_logo.png', // あなたのロゴ
                 // ロゴの高さを画面の高さの約1/4に（お好みで調整）
