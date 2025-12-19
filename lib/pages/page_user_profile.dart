@@ -375,30 +375,30 @@ class _Page_user_profileState extends State<Page_user_profile> {
   /// スキルバッジ（改行対応・省略なし）
   Widget _buildSkillItem({required String label, required String skill}) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start, // 複数行になったときに上揃え
+      crossAxisAlignment: CrossAxisAlignment.center, // 複数行になったときに上揃え
       children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 6.0), // ラベル位置調整
-          child: Text(
+          Text(
             label,
             style: const TextStyle(
                 fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
           ),
-        ),
+
         const SizedBox(width: 4),
         // Flexibleで横幅に収めつつ、ContainerとTextで改行させる
         Flexible(
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
             decoration: BoxDecoration(
               color: Colors.cyan,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               skill,
+              textAlign: TextAlign.center,
               style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 12,
+                  fontSize: 10,
+                  height: 1.5,
                   fontWeight: FontWeight.w500),
             ),
           ),

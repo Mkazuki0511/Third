@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // ← Auth をインポート
 import 'package:cloud_firestore/cloud_firestore.dart'; // ← Firestore をインポート
 import 'page_user_profile.dart'; // ← 「詳しく見る」の遷移先
+import 'package:dropdown_button2/dropdown_button2.dart';
 
 // データを読み込むため StatefulWidget に変更
 class Page_search extends StatefulWidget {
@@ -280,6 +281,7 @@ class _Page_searchState extends State<Page_search> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true, // 高さを画面の9割に
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -299,15 +301,18 @@ class _Page_searchState extends State<Page_search> {
                     children: [
                       const Text(
                           'フィルター',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)
+                          style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold)
                       ),
                       IconButton(
+                        iconSize: 20,
                         icon: const Icon(Icons.close),
                         onPressed: () => Navigator.pop(sheetContext),
                       ),
                     ],
                   ),
-                  const Divider(height: 24),
+                  const SizedBox(height: 4),
+                  const Divider(height: 1),
+                  const SizedBox(height: 30),
 
                   // --- フィルター項目 ---
                   Expanded(
@@ -320,6 +325,8 @@ class _Page_searchState extends State<Page_search> {
                           min: 18,
                           max: 80,
                           divisions: 62,
+                          activeColor: Colors.cyan,
+                          inactiveColor: Colors.grey[200],
                           labels: RangeLabels(
                             tempAgeRange.start.round().toString(),
                             tempAgeRange.end.round().toString(),
@@ -334,27 +341,48 @@ class _Page_searchState extends State<Page_search> {
 
                         // --- 性別 ---
                         Text('性別'),
-                        DropdownButton<String>(
-                          value: tempGender,
-                          hint: const Text('指定なし'),
-                          isExpanded: true,
-                          items: ['男性', '女性', 'その他']
-                              .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                              .toList(),
-                          onChanged: (value) {
-                            setSheetState(() {
-                              tempGender = value;
-                            });
-                          },
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 12,
+                          children: ['男性', '女性'].map((gender) {
+                            final isSelected = tempGender == gender;
+                            return ChoiceChip(
+                              label: Text(gender),
+                              labelStyle: TextStyle(
+                                color: isSelected ? Colors.cyan : Colors.black87,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              selected: isSelected,
+                              selectedColor: Colors.cyan.withOpacity(0.1),
+                              backgroundColor: Colors.white,
+                              side: BorderSide(
+                                color: isSelected ? Colors.cyan : Colors.grey[300]!,
+                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              onSelected: (selected) {
+                                setSheetState(() {
+                                  // 既に選択されていたら解除、そうでなければ選択
+                                  tempGender = selected ? gender : null;
+                                });
+                              },
+                            );
+                          }).toList(),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 32),
 
                         // --- 地域 ---
                         Text('地域'),
-                        DropdownButton<String>(
-                          value: tempRegion,
-                          hint: const Text('指定なし'),
+                        const SizedBox(height: 12),
+                        Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                        child:DropdownButton2<String>(
                           isExpanded: true,
+                          hint: const Text('指定なし'),
                           items: [
                             '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
                             '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
@@ -363,28 +391,64 @@ class _Page_searchState extends State<Page_search> {
                             '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
                             '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
                             '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'] // リスト
-                              .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                              .toList(),
-                          onChanged: (value) {
+                              .map((item) => DropdownMenuItem<String>(
+                                    value: item,
+                                    child: Text(item),
+                              ))
+                            .toList(),
+                            value: tempRegion,
+
+                            onChanged: (value) {
                             setSheetState(() {
                               tempRegion = value;
-                            });
-                          },
-                        ),
-                        // TODO: スキル のドロップダウンも同様に追加
+                             });
+                            },
 
+                            dropdownStyleData: DropdownStyleData(
+                                maxHeight: 300,
+                                decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14), color: Colors.white,
+                                ),
+                              offset: const Offset(0, -20),
+                              scrollbarTheme: ScrollbarThemeData(
+                              radius: const Radius.circular(40),
+                              ),
+                            ),
+
+                            buttonStyleData: ButtonStyleData(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              height: 50,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+
+                              iconStyleData: const IconStyleData(
+                                icon: Icon(Icons.keyboard_arrow_down),
+                                iconSize: 24,
+                                iconEnabledColor: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
 
                   // --- 適用・リセットボタン ---
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.grey, // 文字の色（リセットなので赤などの例）
+                        ),
                         child: const Text('リセット'),
                         onPressed: () {
                           // メイン画面の状態（State）をリセット
-                          setState(() {
+                          setSheetState(() {
                             _selectedRegion = null;
                             _selectedGender = null;
                             _selectedAgeRange = null;
@@ -392,9 +456,22 @@ class _Page_searchState extends State<Page_search> {
                           Navigator.pop(sheetContext); // シートを閉じる
                         },
                       ),
-                      Expanded(
+                      SizedBox(
+                        width: 250,
                         child: ElevatedButton(
-                          child: const Text('適用する'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.cyan,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 0),
+                            alignment: Alignment.center,
+
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text('適用する',
+                            style: TextStyle(fontSize: 14,fontWeight: FontWeight.w500)),
                           onPressed: () {
                             // メイン画面の状態（State）を更新
                             setState(() {
