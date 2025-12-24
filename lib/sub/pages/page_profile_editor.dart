@@ -1,6 +1,10 @@
+import 'dart:io'; // モバイル用
+import 'package:flutter/foundation.dart'; // kIsWeb用
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 class Page_Profile_Editor extends StatefulWidget {
   const Page_Profile_Editor({super.key});
@@ -10,27 +14,39 @@ class Page_Profile_Editor extends StatefulWidget {
 }
 
 class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
-  // Firebaseのインスタンス
+  // Firebaseインスタンス
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final String? _currentUserUid = FirebaseAuth.instance.currentUser?.uid;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final ImagePicker _picker = ImagePicker();
+
+  String? get _currentUserUid => _auth.currentUser?.uid;
 
   // ローディング状態
   bool _isLoading = false;
-  bool _isDataLoading = true; // ← データ読み込み中の状態
+  bool _isDataLoading = true;
 
-  // テキスト入力を管理するコントローラー
+  // テキスト入力コントローラー
   final TextEditingController _learnSkillController = TextEditingController();
   final TextEditingController _teachSkillController = TextEditingController();
   final TextEditingController _selfIntroController = TextEditingController();
 
-  // 各 SelectorRow の選択値を保持する変数
+  // 選択値
   String? _learnSkillLevel;
   String? _teachSkillLevel;
   String? _exchangeMethod;
   String? _availableTime;
 
-  // (page_onboarding_step4 からコピーした選択肢リスト)
+  // --- 画像関連の変数 ---
+  // メイン画像: 既存URL(String) または 新規選択画像(XFile)
+  String? _mainImageUrl;
+  XFile? _newMainImageFile; // FileではなくXFileで保持
+
+  // サブ画像: URL(String) または 新規選択画像(XFile) が混在するリスト
+  List<dynamic> _subImages = [];
+  final int _maxSubImages = 5;
+
+  // 選択肢リスト
   final List<String> _skillLevels = ['初心者', '中級者', '上級者', 'プロレベル'];
   final List<String> _exchangeMethods = ['対面のみ', 'オンラインのみ', 'どちらも可'];
   final List<String> _availableTimes = ['平日 日中', '平日 夜', '土日 祝日', 'いつでも可'];
@@ -38,26 +54,21 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
   @override
   void initState() {
     super.initState();
-    // ↓↓↓↓ 【ここがロジック】 ↓↓↓↓
-    // ページが開かれた瞬間に、既存のデータを読み込む
     _loadCurrentUserData();
-    // ↑↑↑↑ 【ここまで】 ↑↑↑↑
   }
 
-  /// --- 1. 既存のプロフィールデータを読み込むロジック ---
+  /// --- 1. 既存データの読み込み ---
   Future<void> _loadCurrentUserData() async {
     if (_currentUserUid == null) {
-      setState(() { _isDataLoading = false; });
+      setState(() => _isDataLoading = false);
       return;
     }
 
     try {
-      // 自分のドキュメントを 1回だけ取得 (get)
       final doc = await _firestore.collection('users').doc(_currentUserUid).get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
 
-        // 取得したデータで、コントローラーと変数を初期化
         setState(() {
           _learnSkillController.text = data['learnSkill'] ?? '';
           _teachSkillController.text = data['teachSkill'] ?? '';
@@ -66,14 +77,24 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
           _teachSkillLevel = data['teachSkillLevel'];
           _exchangeMethod = data['exchangeMethod'];
           _availableTime = data['availableTime'];
+
+          // 画像データの読み込み
+          _mainImageUrl = data['profileImageUrl'];
+
+          // サブ写真リスト読み込み (フィールド名は subProfileImageUrls)
+          if (data['subProfileImageUrls'] != null && data['subProfileImageUrls'] is List) {
+            _subImages = List.from(data['subProfileImageUrls']);
+          }
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('データの読み込みに失敗しました: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('データの読み込みに失敗しました: $e')),
+        );
+      }
     } finally {
-      setState(() { _isDataLoading = false; });
+      setState(() => _isDataLoading = false);
     }
   }
 
@@ -85,15 +106,94 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
     super.dispose();
   }
 
+  /// --- 画像選択ロジック ---
 
-  /// --- 2. 「保存」ボタンが押されたときの処理 ---
+  Future<void> _pickMainImage() async {
+    try {
+      final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
+      if (picked != null) {
+        setState(() {
+          // XFileのまま保持する
+          _newMainImageFile = picked;
+        });
+      }
+    } catch (e) {
+      debugPrint('画像選択エラー: $e');
+    }
+  }
+
+  Future<void> _pickSubImage() async {
+    if (_subImages.length >= _maxSubImages) return;
+
+    try {
+      final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
+      if (picked != null) {
+        setState(() {
+          _subImages.add(picked);
+        });
+      }
+    } catch (e) {
+      debugPrint('画像選択エラー: $e');
+    }
+  }
+
+  /// --- 画像アップロード用ヘルパー ---
+  /// Webとモバイルでアップロード方法を分ける関数
+  Future<void> _uploadFile(Reference ref, XFile file) async {
+    if (kIsWeb) {
+      // Web: バイトデータでアップロード
+      final bytes = await file.readAsBytes();
+      await ref.putData(bytes);
+    } else {
+      // Mobile: ファイルパスからアップロード
+      await ref.putFile(File(file.path));
+    }
+  }
+
+  /// --- 2. 保存処理 ---
   Future<void> _saveProfile() async {
     if (_currentUserUid == null) return;
 
-    setState(() { _isLoading = true; });
+    setState(() => _isLoading = true);
 
     try {
-      // Firestoreに保存するデータを作成
+      // 1. メイン画像のアップロード処理
+      String? finalMainUrl = _mainImageUrl;
+
+      if (_newMainImageFile != null) {
+        // 新しい画像がある場合
+        final String fileName = 'main_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final Reference ref = _storage.ref().child('profile_images/$_currentUserUid/$fileName');
+
+        await _uploadFile(ref, _newMainImageFile!); // ヘルパー関数を使用
+        finalMainUrl = await ref.getDownloadURL();
+
+      } else if (_mainImageUrl == null) {
+        // 画像が削除された場合
+        finalMainUrl = null;
+      }
+
+      // 2. サブ画像のアップロード処理
+      List<String> finalSubUrls = [];
+
+      for (int i = 0; i < _subImages.length; i++) {
+        final item = _subImages[i];
+
+        if (item is String) {
+          // 既存URLはそのまま
+          finalSubUrls.add(item);
+        } else if (item is XFile) {
+          // 新規画像はアップロード
+          final String fileName = 'sub_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+          final Reference ref = _storage.ref().child('profile_images/$_currentUserUid/$fileName');
+
+          await _uploadFile(ref, item); // ヘルパー関数を使用
+          final String url = await ref.getDownloadURL();
+          finalSubUrls.add(url);
+        }
+      }
+
+      // 3. Firestore更新
       final dataToUpdate = {
         'learnSkill': _learnSkillController.text.trim(),
         'teachSkill': _teachSkillController.text.trim(),
@@ -102,73 +202,93 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
         'teachSkillLevel': _teachSkillLevel,
         'exchangeMethod': _exchangeMethod,
         'availableTime': _availableTime,
+
+        // 画像フィールド
+        'profileImageUrl': finalMainUrl,
+        'subProfileImageUrls': finalSubUrls, // 正しいフィールド名
       };
 
-      // Firestoreのユーザー情報を更新 (update)
       await _firestore.collection('users').doc(_currentUserUid).update(dataToUpdate);
 
-      // 成功したら、前の画面（プロフィール確認）に戻る
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('プロフィールを更新しました！')),
         );
-        // ↓↓↓↓ 【修正】_goToHome から pop に変更 ↓↓↓↓
         Navigator.of(context).pop();
       }
 
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('プロフィールの更新に失敗しました: $e')),
+          SnackBar(content: Text('保存に失敗しました: $e')),
         );
       }
     } finally {
       if (mounted) {
-        setState(() { _isLoading = false; });
+        setState(() => _isLoading = false);
       }
     }
   }
 
-  // (page_onboarding_step4 からコピーしたダイアログ)
+  // ダイアログ表示
   Future<void> _showOptionDialog({
     required String title,
     required List<String> options,
     required ValueChanged<String> onSelected,
   }) async {
     await showDialog(
-        context: context,
-        builder: (BuildContext dialogContext) {
-      return AlertDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
           title: Text(title),
-    content: SizedBox(
-    width: double.maxFinite,
-    height: 300, // 高さを固定
-    child: ListView.builder(
-    shrinkWrap: true,
-    itemCount: options.length,
-    itemBuilder: (BuildContext context, int index) {
-    final option = options[index];
-    return ListTile(
-    title: Text(option),
-    onTap: () {
-    onSelected(option); // 選択された値をコールバックで返す
-    Navigator.of(dialogContext).pop(); // ダイアログを閉じる
-    },
-    );
-    },
-    ),
-    ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('キャンセル'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 300,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: options.length,
+              itemBuilder: (BuildContext context, int index) {
+                final option = options[index];
+                return ListTile(
+                  title: Text(option),
+                  onTap: () {
+                    onSelected(option);
+                    Navigator.of(dialogContext).pop();
+                  },
+                );
+              },
+            ),
           ),
-        ],
-      );
-        },
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        );
+      },
     );
   }
 
+  /// プレビュー表示用のImageProviderを取得するヘルパー
+  ImageProvider? _getImageProvider(dynamic imageSource) {
+    if (imageSource == null) return null;
+
+    if (imageSource is String) {
+      // URLの場合
+      return NetworkImage(imageSource);
+    } else if (imageSource is XFile) {
+      // 新規選択画像の場合
+      if (kIsWeb) {
+        // Web: Blob URLとして読み込む
+        return NetworkImage(imageSource.path);
+      } else {
+        // Mobile: ファイルパスから読み込む
+        return FileImage(File(imageSource.path));
+      }
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -180,10 +300,7 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
         foregroundColor: Colors.black,
         elevation: 1.0,
       ),
-      // ↓↓↓↓ 【修正】ボタンのロジックを変更 ↓↓↓↓
       bottomNavigationBar: _buildBottomButtons(context),
-
-      // ↓↓↓↓ 【修正】データ読み込み中か、保存中かでUIを切り替え ↓↓↓↓
       body: _isDataLoading
           ? const Center(child: CircularProgressIndicator())
           : _isLoading
@@ -194,8 +311,24 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // --- フォーム本体 ---
-              // (page_onboarding_step4 と同じフォーム)
+              // --- 画像編集エリア ---
+              const Text('メイン写真', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              _buildMainImageEditor(),
+              const SizedBox(height: 24),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('サブ写真', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('${_subImages.length} / $_maxSubImages', style: const TextStyle(color: Colors.grey)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildSubImagesEditor(),
+              const SizedBox(height: 24),
+              // --------------------
+
               _buildTextInputField(
                 controller: _learnSkillController,
                 label: '学びたいスキル',
@@ -248,6 +381,7 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
                 hint: 'あなたの人柄や熱意を教えてください',
                 maxLines: 5,
               ),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -255,14 +389,135 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
     );
   }
 
-  // (page_onboarding_step4 と同じUIメソッド)
+  Widget _buildMainImageEditor() {
+    // 優先順位: 新規画像 > 既存URL
+    dynamic imageSource;
+    if (_newMainImageFile != null) {
+      imageSource = _newMainImageFile;
+    } else if (_mainImageUrl != null && _mainImageUrl!.isNotEmpty) {
+      imageSource = _mainImageUrl;
+    }
+
+    final imageProvider = _getImageProvider(imageSource);
+
+    return Center(
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: _pickMainImage,
+            child: CircleAvatar(
+              radius: 60,
+              backgroundColor: Colors.grey[200],
+              backgroundImage: imageProvider,
+              child: imageProvider == null
+                  ? const Icon(Icons.add_a_photo, size: 40, color: Colors.grey)
+                  : null,
+            ),
+          ),
+          if (imageProvider != null)
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _newMainImageFile = null;
+                  _mainImageUrl = null;
+                });
+              },
+              icon: const Icon(Icons.delete, color: Colors.red),
+              label: const Text('削除', style: TextStyle(color: Colors.red)),
+            )
+          else
+            TextButton(
+              onPressed: _pickMainImage,
+              child: const Text('写真を変更'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubImagesEditor() {
+    final bool canAdd = _subImages.length < _maxSubImages;
+    final int itemCount = _subImages.length + (canAdd ? 1 : 0);
+
+    return SizedBox(
+      height: 120,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: itemCount,
+        itemBuilder: (context, index) {
+          // 追加ボタン
+          if (canAdd && index == _subImages.length) {
+            return GestureDetector(
+              onTap: _pickSubImage,
+              child: Container(
+                width: 100,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add, size: 30, color: Colors.grey),
+                    Text('追加', style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          // 画像アイテム
+          final imageItem = _subImages[index];
+          final provider = _getImageProvider(imageItem);
+
+          return Stack(
+            children: [
+              Container(
+                width: 100,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  image: provider != null
+                      ? DecorationImage(image: provider, fit: BoxFit.cover)
+                      : null,
+                  color: Colors.grey[300], // 画像がない場合の背景
+                ),
+              ),
+              Positioned(
+                top: 4,
+                right: 16,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _subImages.removeAt(index);
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 16),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildSelectorRow({
     required String label,
     required String value,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
-      onTap: onTap, // ← 接続
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20.0),
         decoration: const BoxDecoration(
@@ -302,7 +557,7 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
           Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           TextFormField(
-            controller: controller, // ← 接続
+            controller: controller,
             decoration: InputDecoration(
               hintText: hint,
               border: const OutlineInputBorder(),
@@ -315,7 +570,6 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
     );
   }
 
-  /// 画面下部のボタンエリア
   Widget _buildBottomButtons(BuildContext context) {
     return Container(
       color: Colors.white,
@@ -325,7 +579,6 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 保存ボタン
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.cyan,
@@ -334,12 +587,15 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30.0),
                 ),
-                disabledBackgroundColor: Colors.grey[300],
               ),
-              // ↓↓↓↓ 【修正】_goToHome -> _saveProfile に変更 ↓↓↓↓
               onPressed: _isLoading ? null : _saveProfile,
-              child: const Text(
-                '保存する', // ← 文言を「保存する」に変更
+              child: _isLoading
+                  ? const SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+              )
+                  : const Text(
+                '保存する',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
