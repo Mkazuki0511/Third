@@ -32,7 +32,6 @@ class Page_profile_edit extends StatelessWidget {
     final User? currentUser = FirebaseAuth.instance.currentUser;
 
     // 2. StreamBuilderでFirestoreのデータをリアルタイムで監視
-    // (このロジックは、page_profile.dart で実装したものと全く同じです)
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('users')
@@ -56,13 +55,13 @@ class Page_profile_edit extends StatelessWidget {
         final String selfIntroduction = userData['selfIntroduction'] ?? '自己紹介がありません';
         final String teachSkill = userData['teachSkill'] ?? '未設定';
         final String learnSkill = userData['learnSkill'] ?? '未設定';
-        // Firestoreから 'birthday' (Timestamp型) を取得
         final Timestamp? birthdayTimestamp = userData['birthday'];
-        // _calculateAge メソッドに渡して、年齢（String）を取得
         final String age = _calculateAge(birthdayTimestamp);
 
+        // ★修正ポイント: サブ写真のリストを取得
+        final List<dynamic> subImages = userData['subProfileImageUrls'] ?? [];
+
         // --- 5. データを使ってUIを構築 ---
-        // (with-....-0.webp と page_user_profile.dart の雰囲気を参考に構築)
         return Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
@@ -85,8 +84,8 @@ class Page_profile_edit extends StatelessWidget {
                 // メイン写真
                 _buildMainPhotoCard(profileImageUrl),
 
-                // サムネイル (ダミー)
-                _buildThumbnails(),
+                // ★修正ポイント: サブ写真リストを渡して表示
+                _buildThumbnails(subImages),
 
                 // プロフィール情報
                 Padding(
@@ -95,7 +94,6 @@ class Page_profile_edit extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        // 計算した 'age' をここで表示
                         '$nickname $age歳 $location',
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                       ),
@@ -109,7 +107,6 @@ class Page_profile_edit extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
 
-                      // --- Firestoreから読み込んだ本物のデータを表示 ---
                       _buildInfoCard(
                         title: '自己紹介',
                         content: Text(selfIntroduction, style: const TextStyle(fontSize: 16, height: 1.5)),
@@ -154,19 +151,42 @@ class Page_profile_edit extends StatelessWidget {
     );
   }
 
-  /// サムネイル (with-....-0.webp 参考)
-  Widget _buildThumbnails() {
-    // (これはまだダミーデータです)
+  /// ★修正: サブ写真のサムネイル表示 (リストを受け取るように変更)
+  Widget _buildThumbnails(List<dynamic> subImages) {
+    // 写真がない場合は何も表示しない（余白も消す）
+    if (subImages.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 12.0),
       color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(width: 60, height: 60, color: Colors.grey[300], child: const Icon(Icons.person)),
-          const SizedBox(width: 12),
-          Container(width: 60, height: 60, color: Colors.grey[300], child: const Icon(Icons.photo_camera)),
-        ],
+      // 横スクロール可能なリストにする（中央寄せしたい場合は Center + SingleChildScrollView + Row の構成）
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: subImages.map((imageUrl) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8), // 角丸にする
+                    image: DecorationImage(
+                      image: NetworkImage(imageUrl.toString()),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
   }
@@ -196,11 +216,11 @@ class Page_profile_edit extends StatelessWidget {
           onPressed: () {
             // 「編集フォーム」ページへ遷移
             Navigator.push(context, MaterialPageRoute(
-                builder: (context) => const Page_Profile_Editor(),
+              builder: (context) => const Page_Profile_Editor(),
             ));
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.cyan, // with-....-0.webp の色
+            backgroundColor: Colors.cyan,
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30.0),
