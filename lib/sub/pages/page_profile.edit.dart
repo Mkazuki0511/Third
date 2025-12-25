@@ -89,22 +89,32 @@ class Page_profile_edit extends StatelessWidget {
 
                 // プロフィール情報
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 16.0,
+                       horizontal: 32.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                    Row(
+                     crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
                       Text(
                         '$nickname $age歳 $location',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
                       ),
-                      const SizedBox(height: 8),
+
+                        const Spacer(),
+
                       const Row(
                         children: [
                           Icon(Icons.circle, color: Colors.green, size: 12),
                           SizedBox(width: 4),
                           Text('オンライン'),
-                        ],
+                         ],
+                        ),
+                       ],
                       ),
+
                       const SizedBox(height: 16),
 
                       _buildInfoCard(
@@ -114,12 +124,12 @@ class Page_profile_edit extends StatelessWidget {
                       const SizedBox(height: 16),
                       _buildInfoCard(
                         title: '教えるスキル',
-                        content: Text(teachSkill, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        content: Text(teachSkill, style: const TextStyle(fontSize: 16, )),
                       ),
                       const SizedBox(height: 16),
                       _buildInfoCard(
                         title: '学びたいスキル',
-                        content: Text(learnSkill, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        content: Text(learnSkill, style: const TextStyle(fontSize: 16, )),
                       ),
                     ],
                   ),
@@ -203,7 +213,7 @@ class Page_profile_edit extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         content,
