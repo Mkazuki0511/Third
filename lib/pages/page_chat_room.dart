@@ -178,23 +178,32 @@ class _Page_ChatRoomState extends State<Page_ChatRoom> {
 
   /// --- 1件のメッセージ（「自分」か「相手」か）のUI ---
   Widget _buildMessageItem(String text, bool isMe) {
+    final double width = MediaQuery.of(context).size.width;
+    
     return Container(
       // `Row` を使って、`isMe` なら右寄せ、`isMe` でないなら左寄せ
       margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
       child: Row(
         mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
+          Flexible(
+           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
             decoration: BoxDecoration(
               // `isMe` ならシアン、`isMe` でないならグレー
               color: isMe ? Colors.cyan : Colors.grey[200],
               borderRadius: BorderRadius.circular(20.0),
             ),
+              constraints: BoxConstraints(
+               maxWidth: width * 0.7, // 画面幅の70%以上には広がらないようにする
+            ),
             child: Text(
               text,
               style: TextStyle(
                 color: isMe ? Colors.white : Colors.black,
+              ),
+              softWrap: true,
               ),
             ),
           ),
