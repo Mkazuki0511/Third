@@ -35,7 +35,7 @@ class Page_profile_edit extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('users')
-          .doc(currentUser?.uid) // currentUserがnullでもエラーにならないよう ? を追加
+          .doc(currentUser?.uid)
           .snapshots(),
       builder: (context, snapshot) {
 
@@ -58,7 +58,7 @@ class Page_profile_edit extends StatelessWidget {
         final Timestamp? birthdayTimestamp = userData['birthday'];
         final String age = _calculateAge(birthdayTimestamp);
 
-        // ★修正ポイント: サブ写真のリストを取得
+        // サブ写真のリストを取得
         final List<dynamic> subImages = userData['subProfileImageUrls'] ?? [];
 
         // --- 5. データを使ってUIを構築 ---
@@ -81,10 +81,10 @@ class Page_profile_edit extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // メイン写真
+                // メイン写真 (正方形・角丸・余白)
                 _buildMainPhotoCard(profileImageUrl),
 
-                // ★修正ポイント: サブ写真リストを渡して表示
+                // サブ写真リスト
                 _buildThumbnails(subImages),
 
                 // プロフィール情報
@@ -132,28 +132,35 @@ class Page_profile_edit extends StatelessWidget {
     );
   }
 
-  /// メインの写真カード
+  /// メインの写真カード (修正: AspectRatioで正方形にする)
   Widget _buildMainPhotoCard(String? profileImageUrl) {
-    return Container(
-      height: 400, // 高さを指定
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        image: profileImageUrl != null
-            ? DecorationImage(
-          image: NetworkImage(profileImageUrl),
-          fit: BoxFit.cover,
-        )
-            : null,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32,0,32,0),
+      child: AspectRatio(
+        aspectRatio: 1.0, // 1.0 = 正方形 (幅:高さ = 1:1)
+        child: Container(
+          // height: 400, // ← 高さは自動で決まるので削除
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(20),
+            image: profileImageUrl != null
+                ? DecorationImage(
+              image: NetworkImage(profileImageUrl),
+              fit: BoxFit.cover,
+            )
+                : null,
+          ),
+          child: profileImageUrl == null
+              ? const Center(child: Icon(Icons.person, size: 100, color: Colors.white))
+              : null,
+        ),
       ),
-      child: profileImageUrl == null
-          ? const Center(child: Icon(Icons.person, size: 100, color: Colors.white))
-          : null,
     );
   }
 
-  /// ★修正: サブ写真のサムネイル表示 (リストを受け取るように変更)
+  /// サブ写真のサムネイル表示
   Widget _buildThumbnails(List<dynamic> subImages) {
-    // 写真がない場合は何も表示しない（余白も消す）
     if (subImages.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -162,7 +169,6 @@ class Page_profile_edit extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 12.0),
       color: Colors.white,
-      // 横スクロール可能なリストにする（中央寄せしたい場合は Center + SingleChildScrollView + Row の構成）
       child: Center(
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -176,7 +182,7 @@ class Page_profile_edit extends StatelessWidget {
                   height: 60,
                   decoration: BoxDecoration(
                     color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(8), // 角丸にする
+                    borderRadius: BorderRadius.circular(8),
                     image: DecorationImage(
                       image: NetworkImage(imageUrl.toString()),
                       fit: BoxFit.cover,
@@ -191,7 +197,6 @@ class Page_profile_edit extends StatelessWidget {
     );
   }
 
-  /// 自己紹介やスキルを表示する共通カード
   Widget _buildInfoCard({required String title, required Widget content}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,15 +211,13 @@ class Page_profile_edit extends StatelessWidget {
     );
   }
 
-  /// 画面下部に固定される「編集する」ボタン
   Widget _buildFixedEditButton(BuildContext context) {
     return Container(
-      color: Colors.white, // 背景色
+      color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: SafeArea(
         child: ElevatedButton.icon(
           onPressed: () {
-            // 「編集フォーム」ページへ遷移
             Navigator.push(context, MaterialPageRoute(
               builder: (context) => const Page_Profile_Editor(),
             ));
