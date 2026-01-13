@@ -30,7 +30,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'SKILL LINK',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.white),
         useMaterial3: true,
@@ -40,7 +40,9 @@ class MyApp extends StatelessWidget {
           elevation: 0,                       // ★影を消してフラットにするなら0、残すなら数値を指定
         ),
       ),
-       home: const LobbyPage(), //最初の画面
+      home: FirebaseAuth.instance.currentUser != null
+          ? const MyHomePage(title: 'Skill Link')
+          : const LobbyPage(),
     );
   }
 }
