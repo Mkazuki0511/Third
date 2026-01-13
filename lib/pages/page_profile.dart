@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
 import 'package:third/sub/pages/page_favorites.dart';
 import 'package:third/sub/pages/page_profile.edit.dart'; // 「プロフィールを確認・編集」
 import 'package:third/sub/pages/page_footprints.dart'; // 「足あとページ」
-import 'package:third/sub/pages/page_favorites.dart'; // 「いいね履歴」
+import 'package:third/start/pages/lobby.dart';
 
 class Page_profile extends StatelessWidget {
   const Page_profile({super.key});
@@ -529,8 +529,113 @@ class Page_profile extends StatelessWidget {
             trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
             onTap: () {},
           ),
+          // ... 「お知らせ」などの既存項目の後ろに追加 ...
+
+          const Divider(height: 1, indent: 16),
+
+// ---------------------------
+// 4. ログアウト
+// ---------------------------
+          ListTile(
+            leading: const Icon(Icons.logout, color: Colors.grey),
+            title: const Text('ログアウト'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            onTap: () async {
+              // ログアウト確認ダイアログを表示
+              final bool? isLogout = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('確認'),
+                  content: const Text('ログアウトしますか？'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false), // キャンセル
+                      child: const Text('キャンセル'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true), // OK
+                      child: const Text('ログアウト', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+
+              // OKが押されたらログアウト処理実行
+              if (isLogout == true) {
+                await FirebaseAuth.instance.signOut(); // Firebaseからログアウト
+
+                if (context.mounted) {
+                  // ロビー画面へ戻り、これまでの画面履歴を消す
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LobbyPage()),
+                        (route) => false,
+                  );
+                }
+              }
+            },
+          ),
+          const Divider(height: 1, indent: 16),
+
+// ---------------------------
+// 5. 退会（アカウント削除）
+// ---------------------------
+          ListTile(
+            title: const Text('退会する', style: TextStyle(color: Colors.red)), // 赤字で警告感
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            onTap: () async {
+              // 退会確認ダイアログ
+              final bool? isDelete = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('退会の確認'),
+                  content: const Text('アカウントを削除すると、データは復旧できません。\n本当に退会しますか？'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('キャンセル'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('退会する', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              );
+
+              if (isDelete == true) {
+                try {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    // 1. Firestoreのユーザーデータを削除 (必要に応じて)
+                    await FirebaseFirestore.instance.collection('users').doc(user.uid).delete();
+
+                    // 2. Firebase Authのアカウントを削除
+                    await user.delete();
+
+                    if (context.mounted) {
+                      // 3. ロビー画面へ戻る
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LobbyPage()),
+                            (route) => false,
+                      );
+                    }
+                  }
+                } catch (e) {
+                  // エラー処理（ログインから時間が経ちすぎている場合など）
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('退会に失敗しました: $e\n再度ログインしてからお試しください。')),
+                    );
+                  }
+                }
+              }
+            },
+          ),
         ],
       ),
     );
   }
 }
+
