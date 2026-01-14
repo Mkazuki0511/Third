@@ -115,12 +115,16 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-          backgroundColor: Colors.white,
+      bottomNavigationBar: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.only(top: 3.0, bottom: 30.0),
+
+        child:BottomNavigationBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
-          // 2, 5つのアイテムに変更
-
           iconSize: 24.0,
 
           selectedLabelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.normal), // 選択中
@@ -137,7 +141,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         selectedItemColor: Colors.cyan, // 選択中のアイテムの色
         unselectedItemColor: Colors.grey, // 選択されていないアイテムの色
       ),
-    );
+    ));
   }
 }
 
