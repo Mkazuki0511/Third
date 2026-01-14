@@ -1,13 +1,15 @@
-import 'dart:io'; // ← Fileクラスを使うために必要
-import 'package:flutter/foundation.dart' show kIsWeb; // ← kIsWebをインポート
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // ← image_picker をインポート
-import 'package:firebase_storage/firebase_storage.dart'; // ← Storage をインポート
-import 'package:firebase_auth/firebase_auth.dart'; // ← Auth をインポート
-import 'package:cloud_firestore/cloud_firestore.dart'; // ← Firestore をインポート
-import 'page_onboarding_step4.dart'; // ← 次のステップ
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'page_onboarding_step4.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'dart:typed_data';
+import 'package:path_provider/path_provider.dart'; // モバイルの一時保存に必要
 
-// 状態（選択した画像ファイル）を記憶するために StatefulWidget に変更
 class Page_onboarding_step3 extends StatefulWidget {
   const Page_onboarding_step3({super.key});
 
@@ -21,31 +23,60 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ImagePicker _picker = ImagePicker();
 
-
   XFile? _mainImageFile; // メイン写真
-  final List<XFile> _subImageFiles = []; // サブ写真リスト (最大6枚)
+  final List<XFile> _subImageFiles = []; // サブ写真リスト (最大5枚)
   bool _isLoading = false;
 
-
+  /// 画像選択ロジック
   Future<void> _pickImage(ImageSource source, {bool isMain = true}) async {
     try {
-      final XFile? pickedFile = await _picker.pickImage(source: source);
+      // 1. まず標準機能でリサイズしながら取得
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
 
-      if (pickedFile != null) {
-        setState(() {
-          if (isMain) {
-            _mainImageFile = pickedFile;
-          } else {
-            if (_subImageFiles.length < 5) {
-              _subImageFiles.add(pickedFile);
-            }
-          }
-        });
-        if (mounted) Navigator.of(context).pop(); // モーダルを閉じる
+      if (pickedFile == null) return;
+
+      XFile finalFile = pickedFile;
+
+      // 2. モバイル版のみ、この時点で強力に圧縮してファイルを差し替える
+      // (Web版はプレビュー表示を優先するため、アップロード直前に圧縮します)
+      if (!kIsWeb) {
+        final dir = await getTemporaryDirectory();
+        final targetPath = '${dir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+        final XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
+          pickedFile.path,
+          targetPath,
+          minWidth: 800,
+          minHeight: 800,
+          quality: 50, // 画質50% (数百KB程度になります)
+        );
+
+        if (compressedFile != null) {
+          finalFile = compressedFile;
+        }
       }
+
+      // 3. 画面を更新 (Webでもモバイルでも必ず実行される場所に配置)
+      setState(() {
+        if (isMain) {
+          _mainImageFile = finalFile;
+        } else {
+          if (_subImageFiles.length < 5) {
+            _subImageFiles.add(finalFile);
+          }
+        }
+      });
+
+      if (mounted) Navigator.of(context).pop(); // モーダルを閉じる
+
     } catch (e) {
-      print("画像選択エラー: $e");
-      if (mounted) Navigator.of(context).pop(); // エラーでもモーダルを閉じる
+      debugPrint("画像選択エラー: $e");
+      if (mounted) Navigator.of(context).pop();
     }
   }
 
@@ -100,60 +131,78 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('まず、メイン写真を選択してください')),
       );
-      return; // 処理を中断
+      return;
     }
 
-    // 2. 現在のユーザーIDを取得 (Authから)
+    // 2. ユーザーID取得
     final User? user = _auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('エラー: ユーザーがログインしていません')),
       );
-      return; // 処理を中断
+      return;
     }
 
     setState(() {
-      _isLoading = true; // ローディング開始
+      _isLoading = true;
     });
 
     try {
       // 3. Storageにアップロード
-      // メイン写真のアップロード
       String mainImageUrl = '';
       final String mainPath = 'profile_images/${user.uid}/main_profile.jpg';
       final mainRef = _storage.ref().child(mainPath);
 
+      // --- メイン画像のアップロード処理 ---
       if (kIsWeb) {
-        // Webの場合：Uint8List (バイトデータ) としてアップロード
-        await mainRef.putData(await _mainImageFile!.readAsBytes());
+        // Web版：ここで圧縮を行ってからアップロード
+        final Uint8List bytes = await _mainImageFile!.readAsBytes();
+        final Uint8List compressedBytes = await FlutterImageCompress.compressWithList(
+          bytes,
+          minWidth: 800,
+          minHeight: 800,
+          quality: 50,
+          format: CompressFormat.jpeg,
+        );
+        await mainRef.putData(compressedBytes);
       } else {
-        // Mobileの場合：File としてアップロード
+        // モバイル版：すでに圧縮済みなのでそのままアップロード
         await mainRef.putFile(File(_mainImageFile!.path));
       }
       mainImageUrl = await mainRef.getDownloadURL();
 
-      // サブ写真のアップロード
+      // --- サブ画像のアップロード処理 ---
       List<String> subImageUrls = [];
       for (int i = 0; i < _subImageFiles.length; i++) {
         final String subPath = 'profile_images/${user.uid}/sub_profile_$i.jpg';
         final subRef = _storage.ref().child(subPath);
 
         if (kIsWeb) {
-          await subRef.putData(await _subImageFiles[i].readAsBytes());
+          // Web版：圧縮してアップロード
+          final Uint8List bytes = await _subImageFiles[i].readAsBytes();
+          final Uint8List compressedBytes = await FlutterImageCompress.compressWithList(
+            bytes,
+            minWidth: 800,
+            minHeight: 800,
+            quality: 50,
+            format: CompressFormat.jpeg,
+          );
+          await subRef.putData(compressedBytes);
         } else {
+          // モバイル版：そのままアップロード
           await subRef.putFile(File(_subImageFiles[i].path));
         }
         final String url = await subRef.getDownloadURL();
         subImageUrls.add(url);
       }
 
-      // 4. Firestoreのユーザー情報を更新
+      // 4. Firestore更新
       await _firestore.collection('users').doc(user.uid).update({
         'profileImageUrl': mainImageUrl,
         'subProfileImageUrls': subImageUrls,
       });
 
-      // 5. 成功したら次のStep4（詳細プロフ）へ
+      // 5. 次へ
       if (mounted) {
         Navigator.push(context, MaterialPageRoute(
           builder: (context) => const Page_onboarding_step4(),
@@ -161,14 +210,12 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
       }
 
     } catch (e) {
-      // エラー処理
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('アップロードに失敗しました: $e')),
         );
       }
     } finally {
-      // 処理が完了したらローディングを解除
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -197,7 +244,6 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- 1. ヘッダー (変更なし) ---
             const Text(
               '次は、あなたの顔が写っている\nメイン写真を登録しましょう',
               textAlign: TextAlign.center,
@@ -205,64 +251,57 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
             ),
             const SizedBox(height: 32),
 
-            // メイン写真
+            // --- メイン写真エリア ---
             Center(
-              // ↓↓↓↓ 【タップ可能にする】 ↓↓↓↓
               child: GestureDetector(
-                onTap: () {
-                  // プレビュー画像をタップしてもモーダルが開くようにする
-                  _showImagePickerModal(context);
-                },
+                onTap: () => _showImagePickerModal(context),
                 child: Stack(
-                  clipBehavior: Clip.none, // ＋ボタンが少しはみ出ても表示されるようにする
-                  alignment: Alignment.bottomRight, // 右下に配置
-                children: [
-                  Container(
-                  width: 180,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    shape: BoxShape.rectangle,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
-                    image: _mainImageFile  != null
-                        ? DecorationImage(
-                      image: (kIsWeb
-                          ? NetworkImage(_mainImageFile!.path)
-                          : FileImage(File(_mainImageFile!.path))) as ImageProvider,
-                      fit: BoxFit.cover,
-                    )
-                        : null,
-                  ),
-                  child: _mainImageFile == null
-                      ? const Icon(
-                      Icons.person,
-                      size: 100,
-                      color: Colors.grey)
-                      : null,
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      width: 180,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        shape: BoxShape.rectangle,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                        image: _mainImageFile != null
+                            ? DecorationImage(
+                          image: (kIsWeb
+                              ? NetworkImage(_mainImageFile!.path)
+                              : FileImage(File(_mainImageFile!.path)))
+                          as ImageProvider,
+                          fit: BoxFit.cover,
+                        )
+                            : null,
+                      ),
+                      child: _mainImageFile == null
+                          ? const Icon(Icons.person, size: 100, color: Colors.grey)
+                          : null,
+                    ),
+                    Positioned(
+                      bottom: -10,
+                      right: -10,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: const BoxDecoration(
+                          color: Colors.cyan,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.add,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                // 2. 右下の「＋」ボタン
-                Positioned(
-                bottom: -10, // 位置の微調整（少し外側に出す場合）
-                right: -10,
-                child: Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                color: Colors.cyan, // 参考画像に近い青紫色（お好みでColors.blueなど）
-                shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 24,
               ),
             ),
-          ),
-        ],
-      ),
-    ),
-  ),
 
             const SizedBox(height: 8),
             const Text('メイン写真', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
@@ -285,7 +324,7 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
               ),
               itemCount: _subImageFiles.length + (_subImageFiles.length < 5 ? 1 : 0),
               itemBuilder: (context, index) {
-                // 「追加ボタン」を表示する場合
+                // 追加ボタン
                 if (index == _subImageFiles.length) {
                   return GestureDetector(
                     onTap: () => _showImagePickerModal(context, isMain: false),
@@ -300,7 +339,7 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
                   );
                 }
 
-                // 選択済み画像を表示する場合
+                // 選択済み画像
                 final file = _subImageFiles[index];
                 return Stack(
                   clipBehavior: Clip.none,
@@ -311,12 +350,12 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
                         image: DecorationImage(
                           image: (kIsWeb
                               ? NetworkImage(file.path)
-                              : FileImage(File(file.path))) as ImageProvider,
+                              : FileImage(File(file.path)))
+                          as ImageProvider,
                           fit: BoxFit.cover,
                         ),
                       ),
                     ),
-                    // 削除ボタン
                     Positioned(
                       top: -8,
                       right: -8,
@@ -335,7 +374,6 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
             ),
             const SizedBox(height: 32),
 
-
             // --- 登録ボタン ---
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -345,23 +383,19 @@ class _Page_onboarding_step3State extends State<Page_onboarding_step3> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30.0),
                 ),
-                // ↓↓↓↓ 【画像が選択されていなければ無効】 ↓↓↓↓
                 disabledBackgroundColor: Colors.grey[300],
               ),
-              // ↓↓↓↓ 【画像がなければ押せない(null)、あれば _uploadAndNavigate を呼ぶ】 ↓↓↓↓
               onPressed: _mainImageFile != null ? _uploadAndNavigate : null,
               child: const Text(
-                '次へ', // ← 文言を「次へ」に変更
+                '次へ',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 16),
 
             // --- スキップボタン ---
-            // メイン写真の登録は必須ではない（あとからでも良い）場合
             TextButton(
               onPressed: () {
-                // 画像を登録せずに次のStep4へ
                 Navigator.push(context, MaterialPageRoute(
                   builder: (context) => const Page_onboarding_step4(),
                 ));

@@ -5,6 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:path_provider/path_provider.dart';
 
 class Page_Profile_Editor extends StatefulWidget {
   const Page_Profile_Editor({super.key});
@@ -110,11 +113,35 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
 
   Future<void> _pickMainImage() async {
     try {
-      final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
       if (picked != null) {
+        XFile finalFile = picked;
+
+        // ★ Mobileの場合、この時点で圧縮してファイルを差し替える
+        if (!kIsWeb) {
+          final dir = await getTemporaryDirectory();
+          final targetPath = '${dir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+          final XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
+            picked.path,
+            targetPath,
+            minWidth: 800,
+            minHeight: 800,
+            quality: 50,
+          );
+          if (compressedFile != null) {
+            finalFile = compressedFile;
+          }
+        }
+
         setState(() {
-          // XFileのまま保持する
-          _newMainImageFile = picked;
+          _newMainImageFile = finalFile;
         });
       }
     } catch (e) {
@@ -126,10 +153,35 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
     if (_subImages.length >= _maxSubImages) return;
 
     try {
-      final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
+      final XFile? picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
       if (picked != null) {
+        XFile finalFile = picked;
+
+        // ★ Mobileの場合、この時点で圧縮してファイルを差し替える
+        if (!kIsWeb) {
+          final dir = await getTemporaryDirectory();
+          final targetPath = '${dir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+          final XFile? compressedFile = await FlutterImageCompress.compressAndGetFile(
+            picked.path,
+            targetPath,
+            minWidth: 800,
+            minHeight: 800,
+            quality: 50,
+          );
+          if (compressedFile != null) {
+            finalFile = compressedFile;
+          }
+        }
+
         setState(() {
-          _subImages.add(picked);
+          _subImages.add(finalFile);
         });
       }
     } catch (e) {
@@ -138,14 +190,25 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
   }
 
   /// --- 画像アップロード用ヘルパー ---
-  /// Webとモバイルでアップロード方法を分ける関数
+  /// Webとモバイルでアップロード方法を分ける（Webの場合はここで圧縮も行う）
   Future<void> _uploadFile(Reference ref, XFile file) async {
     if (kIsWeb) {
-      // Web: バイトデータでアップロード
+      // ★ Web: バイトデータで読み込み、圧縮してからアップロード
       final bytes = await file.readAsBytes();
-      await ref.putData(bytes);
+
+      final Uint8List compressedBytes = await FlutterImageCompress.compressWithList(
+        bytes,
+        minWidth: 800,
+        minHeight: 800,
+        quality: 50,
+        format: CompressFormat.jpeg, // 強制的にJPEG化
+      );
+
+      // 圧縮データとしてアップロード (metadataでcontentTypeを指定すると親切です)
+      await ref.putData(compressedBytes, SettableMetadata(contentType: 'image/jpeg'));
+
     } else {
-      // Mobile: ファイルパスからアップロード
+      // Mobile: すでにpick時点で圧縮されているファイルパスからアップロード
       await ref.putFile(File(file.path));
     }
   }
@@ -165,7 +228,7 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
         final String fileName = 'main_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final Reference ref = _storage.ref().child('profile_images/$_currentUserUid/$fileName');
 
-        await _uploadFile(ref, _newMainImageFile!); // ヘルパー関数を使用
+        await _uploadFile(ref, _newMainImageFile!); // ヘルパー関数で圧縮＆アップロード
         finalMainUrl = await ref.getDownloadURL();
 
       } else if (_mainImageUrl == null) {
@@ -187,7 +250,7 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
           final String fileName = 'sub_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
           final Reference ref = _storage.ref().child('profile_images/$_currentUserUid/$fileName');
 
-          await _uploadFile(ref, item); // ヘルパー関数を使用
+          await _uploadFile(ref, item); // ヘルパー関数で圧縮＆アップロード
           final String url = await ref.getDownloadURL();
           finalSubUrls.add(url);
         }
@@ -205,7 +268,8 @@ class _Page_Profile_EditorState extends State<Page_Profile_Editor> {
 
         // 画像フィールド
         'profileImageUrl': finalMainUrl,
-        'subProfileImageUrls': finalSubUrls, // 正しいフィールド名
+        'subProfileImageUrls': finalSubUrls,
+        'updatedAt': FieldValue.serverTimestamp(), // 更新日時も入れておくと便利です
       };
 
       await _firestore.collection('users').doc(_currentUserUid).update(dataToUpdate);
