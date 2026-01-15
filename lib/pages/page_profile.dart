@@ -58,7 +58,6 @@ class Page_profile extends StatelessWidget {
 
         // 6. データを使ってUIを構築
         return Scaffold(
-          backgroundColor: Colors.grey[100],
           body: SafeArea(
             child: SingleChildScrollView(
               child: Padding(
@@ -88,10 +87,8 @@ class Page_profile extends StatelessWidget {
   /// ヘッダー（アイコン、統計、編集ボタン）
   // ↓↓↓↓ 【修正】userData を受け取るように変更 ↓↓↓↓
   Widget _buildHeader(BuildContext context, Map<String, dynamic> userData) {
-    // Firestoreから nickname と profileImageUrl を取得
     final String nickname = userData['nickname'] ?? '名前なし';
     final String? profileImageUrl = userData['profileImageUrl']; // null の可能性がある
-    // Firestoreから tickets と plan を取得
     final int tickets = userData['tickets'] ?? 0; // チケット数
     final String plan = userData['plan'] ?? '無料';
 

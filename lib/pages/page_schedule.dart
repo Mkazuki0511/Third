@@ -54,9 +54,6 @@ class _Page_scheduleState extends State<Page_schedule> {
         foregroundColor: Colors.black,
         elevation: 0,
         actions: [
-          // ↓↓↓↓ 【修正③】AppBarのアイコンロジック（15:28の計画） ↓↓↓↓
-          // _isProvidingSelected が true（提供）なら 🔔
-          // _isProvidingSelected が false（利用）なら ＋
           if (_isProvidingSelected)
             IconButton(
               icon: const Icon(Icons.notifications_none), // 鈴 🔔
@@ -66,18 +63,28 @@ class _Page_scheduleState extends State<Page_schedule> {
                 ));
               },
             )
-          else
-            IconButton(
-              icon: const Icon(Icons.add_circle_outline), // ＋
-              onPressed: () {
-                // 「予定作成」ページへ遷移
-                Navigator.push(context, MaterialPageRoute(
-                  builder: (context) => const Page_create_schedule(),
-                ));
-              },
-            ),
         ],
       ),
+
+      floatingActionButton: !_isProvidingSelected
+          ? SizedBox(
+        width: 70, // ボタンのサイズ（標準より少し大きくしています）
+        height: 70,
+        child: FloatingActionButton(
+          backgroundColor: Colors.cyan, // シアン色
+          shape: const CircleBorder(),   // 真円にする
+          onPressed: () {
+            // 「予定作成」ページへ遷移 (ロジックはそのまま)
+            Navigator.push(context, MaterialPageRoute(
+              builder: (context) => const Page_create_schedule(),
+            ));
+          },
+          child: const Icon(Icons.add, size: 40, color: Colors.white), // 白い＋アイコン
+        ),
+      )
+          : null,
+
+
       body: Column(
         children: [
           const SizedBox(height: 24),

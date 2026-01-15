@@ -77,7 +77,6 @@ class _Page_approvalState extends State<Page_approval> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       body: SafeArea(
         child: Column(
           children: [
