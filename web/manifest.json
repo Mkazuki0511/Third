@@ -1,11 +1,11 @@
 {
-    "name": "third",
-    "short_name": "third",
+    "name": "SKILL LINK",
+    "short_name": "SKILL LINK",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F7F7F7",
+    "theme_color": "#F7F7F7",
+    "description": "A SKILL LINK project.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
