@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'page_user_profile.dart'; // 「詳しく見る」用
 
-// このページは page_approval.dart とほぼ同じ構成です
 class Page_schedule_requests extends StatefulWidget {
   const Page_schedule_requests({super.key});
 
@@ -22,13 +21,9 @@ class _Page_schedule_requestsState extends State<Page_schedule_requests> {
   /// --- 「承認」ロジック ---
   Future<void> _approveSchedule(String scheduleId) async {
     final String? myId = _auth.currentUser?.uid;
-    final String receiverId = (await _firestore.collection('schedules').doc(scheduleId).get()).data()!['receiverId'];
-
     if (myId == null) return;
 
     try {
-      // トランザクション -> シンプルな update に戻す
-      // (servicesUsedCount の +1 を削除したため)
       await _firestore.collection('schedules').doc(scheduleId).update({
         'status': 'approved',
       });
@@ -39,7 +34,6 @@ class _Page_schedule_requestsState extends State<Page_schedule_requests> {
         );
       }
     } catch (e) {
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('承認処理に失敗しました: $e')),
@@ -48,18 +42,42 @@ class _Page_schedule_requestsState extends State<Page_schedule_requests> {
     }
   }
 
-  /// --- 「拒否」ロジック ---
-  Future<void> _denySchedule(String scheduleId) async {
+  /// --- 「拒否」ロジック (修正版) ---
+  /// ステータスを 'denied' にし、申請者のチケットを +1 返却する
+  Future<void> _denySchedule(String scheduleId, String requesterId) async {
     try {
-      // status を 'denied'（拒否）に更新
-      await _firestore.collection('schedules').doc(scheduleId).update({
-        'status': 'denied',
+      await _firestore.runTransaction((transaction) async {
+        // 参照を取得
+        final scheduleRef = _firestore.collection('schedules').doc(scheduleId);
+        final userRef = _firestore.collection('users').doc(requesterId);
+
+        // 1. スケジュールのステータスを 'denied' に更新
+        transaction.update(scheduleRef, {
+          'status': 'denied',
+        });
+
+        // 2. 申請者 (requesterId) のチケットを 1枚増やす (返却)
+        transaction.update(userRef, {
+          'tickets': FieldValue.increment(1),
+        });
       });
+
+      // 成功時のメッセージ
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('申請を拒否し、相手にチケットを返却しました。')),
+        );
+      }
     } catch (e) {
       // エラー処理
+      debugPrint('拒否エラー: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('エラーが発生しました: $e')),
+        );
+      }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +112,6 @@ class _Page_schedule_requestsState extends State<Page_schedule_requests> {
                 }
                 // エラー
                 if (requestSnapshot.hasError) {
-                  // (注：このクエリも「インデックス」が必要です)
                   return Center(child: Text('エラー: ${requestSnapshot.error}'));
                 }
                 // リクエスト 0件
@@ -119,7 +136,8 @@ class _Page_schedule_requestsState extends State<Page_schedule_requests> {
                       requesterId: requesterId,
                       scheduleData: scheduleData,
                       onApprove: () => _approveSchedule(scheduleId),
-                      onDeny: () => _denySchedule(scheduleId),
+                      // 拒否ボタン押下時に、scheduleId と requesterId の両方を渡す
+                      onDeny: () => _denySchedule(scheduleId, requesterId),
                     );
                   },
                 );
@@ -132,10 +150,7 @@ class _Page_schedule_requestsState extends State<Page_schedule_requests> {
   }
 }
 
-
-
-// --- ↓↓↓↓ 【ここからが新設ウィジェット】 ↓↓↓↓ ---
-/// --- 申請カード本体（`requesterId` からユーザー情報を取得する） ---
+// --- ↓↓↓↓ カードウィジェット ↓↓↓↓ ---
 class _ScheduleRequestCard extends StatefulWidget {
   final String requesterId;
   final Map<String, dynamic> scheduleData;
@@ -154,20 +169,19 @@ class _ScheduleRequestCard extends StatefulWidget {
 }
 
 class _ScheduleRequestCardState extends State<_ScheduleRequestCard> {
-  // `requesterId` を元に取得した「申請者」のユーザーデータ
   late Future<DocumentSnapshot<Map<String, dynamic>>> _userDataFuture;
 
   @override
   void initState() {
     super.initState();
-    // 5. `requesterId` を使って、'users' コレクションから申請者のデータを取得
+    // ユーザーデータを取得
     _userDataFuture = FirebaseFirestore.instance
         .collection('users')
         .doc(widget.requesterId)
         .get();
   }
 
-  /// --- scheduleAt(Timestamp) を「yyyy年MM月dd日 HH:mm」に変換 ---
+  /// 日時フォーマット
   String _formatTimestamp(Timestamp? timestamp) {
     if (timestamp == null) return '日時未定';
     final DateTime dt = timestamp.toDate();
@@ -176,30 +190,23 @@ class _ScheduleRequestCardState extends State<_ScheduleRequestCard> {
 
   @override
   Widget build(BuildContext context) {
-    // 6. `FutureBuilder` でユーザーデータの読み込みを待つ
     return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       future: _userDataFuture,
       builder: (context, userSnapshot) {
-
-        // ユーザーデータ読み込み中
         if (userSnapshot.connectionState == ConnectionState.waiting) {
           return const Card(child: ListTile(title: Text('読み込み中...')));
         }
-        // ユーザーデータエラー
         if (!userSnapshot.hasData || !userSnapshot.data!.exists) {
           return const Card(child: ListTile(title: Text('ユーザーが見つかりません')));
         }
 
-        // 7. 成功！申請者のデータを取得
         final userData = userSnapshot.data!.data()!;
         final String nickname = userData['nickname'] ?? '名無し';
         final String? profileImageUrl = userData['profileImageUrl'];
 
-        // 8. 予定データを取得
         final String serviceName = widget.scheduleData['serviceName'] ?? 'スキル交換';
         final Timestamp? scheduleAt = widget.scheduleData['scheduleAt'];
 
-        // 9. 取得したデータを使って「申請カードUI」を構築
         return Card(
           margin: const EdgeInsets.only(bottom: 16.0),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
@@ -236,7 +243,7 @@ class _ScheduleRequestCardState extends State<_ScheduleRequestCard> {
                     // 拒否ボタン
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: widget.onDeny, // 拒否ロジック
+                        onPressed: widget.onDeny, // 修正されたロジックを実行
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.grey[700],
                           side: BorderSide(color: Colors.grey.shade300),
@@ -248,7 +255,7 @@ class _ScheduleRequestCardState extends State<_ScheduleRequestCard> {
                     // 承認ボタン
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: widget.onApprove, // 承認ロジック
+                        onPressed: widget.onApprove,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.cyan,
                           foregroundColor: Colors.white,
