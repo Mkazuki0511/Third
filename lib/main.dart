@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:third/pages/page_user_profile.dart';
 import 'package:third/start/pages/lobby.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:third/pages/page_search.dart';
@@ -8,9 +7,10 @@ import 'package:third/pages/page_profile.dart';
 import 'package:third/pages/page_approval.dart';
 import 'package:third/pages/page_schedule.dart';
 import 'firebase_options.dart';
-import 'package:third/sub/pages/page_profile.edit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:html' as html;
+import 'package:flutter/foundation.dart';
 
 
 void main() async {
@@ -21,6 +21,20 @@ void main() async {
   runApp(
     const MyApp(),
   );
+
+  if (kIsWeb) {
+    // 画面の描画が終わるのを少しだけ待つ（一瞬チラつくのを防ぐため）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final loader = html.document.getElementById('loading-screen');
+      if (loader != null) {
+        loader.style.opacity = '0'; // ふわっと消す
+        // 0.5秒後に完全に削除
+        Future.delayed(const Duration(milliseconds: 500), () {
+          loader.remove();
+        });
+      }
+    });
+  }
 }
 
 
